@@ -34,7 +34,12 @@ class LipGLSurfaceView @JvmOverloads constructor(
 
     init {
         setEGLContextClientVersion(2)
-        setEGLConfigChooser(8, 8, 8, 8, 16, 0)
+        try {
+            setEGLConfigChooser(8, 8, 8, 8, 16, 0)
+        } catch (e: Exception) {
+            // Fallback: let GLSurfaceView pick a default config
+            setEGLConfigChooser(8, 8, 8, 8, 0, 0)
+        }
         holder.setFormat(PixelFormat.TRANSLUCENT)
         setRenderer(renderer)
         renderMode = RENDERMODE_WHEN_DIRTY

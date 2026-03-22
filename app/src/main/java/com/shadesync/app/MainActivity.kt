@@ -84,15 +84,6 @@ class MainActivity : AppCompatActivity() {
         binding = ActivityMainBinding.inflate(layoutInflater)
         setContentView(binding.root)
 
-        if (ContextCompat.checkSelfPermission(this, Manifest.permission.CAMERA)
-            == PackageManager.PERMISSION_GRANTED
-        ) {
-            setupFaceLandmarker()
-            startCamera()
-        } else {
-            cameraPermissionLauncher.launch(Manifest.permission.CAMERA)
-        }
-
         setupShadePicker()
         setupFinishToggle()
         setupLightingControls()
@@ -100,6 +91,19 @@ class MainActivity : AppCompatActivity() {
         setupSkinAnalysis()
         setupLookPresets()
         setupCollapsiblePanel()
+
+        // Delay camera init until views are attached to the window
+        // (avoids NPE on View.getDisplay() which can be null before attachment)
+        binding.root.post {
+            if (ContextCompat.checkSelfPermission(this, Manifest.permission.CAMERA)
+                == PackageManager.PERMISSION_GRANTED
+            ) {
+                setupFaceLandmarker()
+                startCamera()
+            } else {
+                cameraPermissionLauncher.launch(Manifest.permission.CAMERA)
+            }
+        }
     }
 
     // ── Save & Share ──
@@ -685,35 +689,41 @@ class MainActivity : AppCompatActivity() {
         val cameraProviderFuture = ProcessCameraProvider.getInstance(this)
 
         cameraProviderFuture.addListener({
-            val cameraProvider = cameraProviderFuture.get()
-
-            // Force both Preview and Analysis to same 4:3 aspect so
-            // normalized landmark coordinates align precisely.
-            val preview = Preview.Builder()
-                .setTargetAspectRatio(AspectRatio.RATIO_4_3)
-                .build()
-                .also { it.setSurfaceProvider(binding.previewView.surfaceProvider) }
-
-            val imageAnalysis = ImageAnalysis.Builder()
-                .setTargetAspectRatio(AspectRatio.RATIO_4_3)
-                .setTargetRotation(binding.previewView.display.rotation)
-                .setBackpressureStrategy(ImageAnalysis.STRATEGY_KEEP_ONLY_LATEST)
-                .setOutputImageFormat(ImageAnalysis.OUTPUT_IMAGE_FORMAT_RGBA_8888)
-                .build()
-
-            imageAnalysis.setAnalyzer(analysisExecutor) { imageProxy ->
-                analyzeImage(imageProxy)
-            }
-
-            val cameraSelector = CameraSelector.Builder()
-                .requireLensFacing(CameraSelector.LENS_FACING_FRONT)
-                .build()
-
             try {
+                val cameraProvider = cameraProviderFuture.get()
+
+                // Force both Preview and Analysis to same 4:3 aspect so
+                // normalized landmark coordinates align precisely.
+                val preview = Preview.Builder()
+                    .setTargetAspectRatio(AspectRatio.RATIO_4_3)
+                    .build()
+                    .also { it.setSurfaceProvider(binding.previewView.surfaceProvider) }
+
+                val rotation = binding.previewView.display?.rotation
+                    ?: android.view.Surface.ROTATION_0
+
+                val imageAnalysis = ImageAnalysis.Builder()
+                    .setTargetAspectRatio(AspectRatio.RATIO_4_3)
+                    .setTargetRotation(rotation)
+                    .setBackpressureStrategy(ImageAnalysis.STRATEGY_KEEP_ONLY_LATEST)
+                    .setOutputImageFormat(ImageAnalysis.OUTPUT_IMAGE_FORMAT_RGBA_8888)
+                    .build()
+
+                imageAnalysis.setAnalyzer(analysisExecutor) { imageProxy ->
+                    analyzeImage(imageProxy)
+                }
+
+                val cameraSelector = CameraSelector.Builder()
+                    .requireLensFacing(CameraSelector.LENS_FACING_FRONT)
+                    .build()
+
                 cameraProvider.unbindAll()
                 cameraProvider.bindToLifecycle(this, cameraSelector, preview, imageAnalysis)
             } catch (e: Exception) {
-                Log.e(TAG, "Camera bind failed", e)
+                Log.e(TAG, "Camera setup failed", e)
+                runOnUiThread {
+                    Toast.makeText(this, "Camera initialization failed", Toast.LENGTH_LONG).show()
+                }
             }
         }, ContextCompat.getMainExecutor(this))
     }
