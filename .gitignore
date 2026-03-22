@@ -10,6 +10,7 @@
 .cxx
 local.properties
 *.apk
+!releases/*.apk
 *.aab
 *.ap_
 *.dex

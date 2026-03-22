@@ -17,6 +17,17 @@
   <img src="https://img.shields.io/badge/Min%20SDK-24-blue" />
 </p>
 
+<p align="center">
+  <a href="https://github.com/DishankChauhan/shadeSync/raw/main/releases/ShadeSync-v1.0.apk">
+    <img src="https://img.shields.io/badge/⬇_Download_APK-v1.0-brightgreen?style=for-the-badge&logo=android" alt="Download APK" />
+  </a>
+</p>
+
+<p align="center">
+  <b>👆 Tap the button above to download and install directly on your Android device</b><br>
+  <sub>No Play Store needed — enable "Install from unknown sources" in your phone settings</sub>
+</p>
+
 ---
 
 ## What is ShadeSync?
