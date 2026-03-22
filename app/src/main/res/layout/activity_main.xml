@@ -197,7 +197,7 @@
 
         </LinearLayout>
 
-        <!-- Shade name label -->
+        <!-- Shade name + brand label -->
         <TextView
             android:id="@+id/shadeName"
             android:layout_width="wrap_content"
@@ -207,59 +207,71 @@
             android:textSize="15sp"
             android:fontFamily="sans-serif-medium"
             android:letterSpacing="0.06"
-            android:layout_marginBottom="12dp" />
+            android:layout_marginBottom="4dp" />
 
-        <!-- Colour swatches -->
-        <LinearLayout
-            android:id="@+id/colorPickerBar"
+        <TextView
+            android:id="@+id/shadeBrand"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:text="ShadeSync"
+            android:textColor="#90FFFFFF"
+            android:textSize="11sp"
+            android:layout_marginBottom="10dp" />
+
+        <!-- Brand filter chips (horizontal scroll) -->
+        <HorizontalScrollView
             android:layout_width="match_parent"
             android:layout_height="wrap_content"
-            android:gravity="center"
+            android:scrollbars="none"
+            android:layout_marginBottom="8dp"
+            android:paddingStart="12dp"
+            android:paddingEnd="12dp">
+
+            <LinearLayout
+                android:id="@+id/brandChipsRow"
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:orientation="horizontal" />
+
+        </HorizontalScrollView>
+
+        <!-- Search bar + HEX input -->
+        <LinearLayout
+            android:layout_width="match_parent"
+            android:layout_height="36dp"
             android:orientation="horizontal"
-            android:paddingBottom="48dp"
-            android:paddingTop="4dp">
+            android:layout_marginStart="16dp"
+            android:layout_marginEnd="16dp"
+            android:layout_marginBottom="10dp"
+            android:background="@drawable/toggle_bg"
+            android:gravity="center_vertical"
+            android:paddingStart="12dp"
+            android:paddingEnd="8dp">
 
-            <View
-                android:id="@+id/btnColorRed"
-                android:layout_width="48dp"
-                android:layout_height="48dp"
-                android:layout_marginStart="10dp"
-                android:layout_marginEnd="10dp"
-                android:background="@drawable/color_circle_red" />
-
-            <View
-                android:id="@+id/btnColorPink"
-                android:layout_width="48dp"
-                android:layout_height="48dp"
-                android:layout_marginStart="10dp"
-                android:layout_marginEnd="10dp"
-                android:background="@drawable/color_circle_pink" />
-
-            <View
-                android:id="@+id/btnColorBerry"
-                android:layout_width="48dp"
-                android:layout_height="48dp"
-                android:layout_marginStart="10dp"
-                android:layout_marginEnd="10dp"
-                android:background="@drawable/color_circle_berry" />
-
-            <View
-                android:id="@+id/btnColorNude"
-                android:layout_width="48dp"
-                android:layout_height="48dp"
-                android:layout_marginStart="10dp"
-                android:layout_marginEnd="10dp"
-                android:background="@drawable/color_circle_nude" />
-
-            <View
-                android:id="@+id/btnColorOrange"
-                android:layout_width="48dp"
-                android:layout_height="48dp"
-                android:layout_marginStart="10dp"
-                android:layout_marginEnd="10dp"
-                android:background="@drawable/color_circle_orange" />
+            <EditText
+                android:id="@+id/shadeSearch"
+                android:layout_width="0dp"
+                android:layout_height="match_parent"
+                android:layout_weight="1"
+                android:hint="Search shade, brand, or #HEX..."
+                android:textColorHint="#60FFFFFF"
+                android:textColor="#FFFFFF"
+                android:textSize="12sp"
+                android:background="@android:color/transparent"
+                android:imeOptions="actionSearch"
+                android:inputType="text"
+                android:maxLines="1" />
 
         </LinearLayout>
+
+        <!-- Dynamic shade swatches (RecyclerView) -->
+        <androidx.recyclerview.widget.RecyclerView
+            android:id="@+id/shadeRecycler"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:paddingBottom="48dp"
+            android:paddingTop="4dp"
+            android:clipToPadding="false" />
 
     </LinearLayout>
 

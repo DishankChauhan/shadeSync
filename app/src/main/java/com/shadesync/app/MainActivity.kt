@@ -8,14 +8,19 @@ import android.graphics.Bitmap
 import android.graphics.Canvas
 import android.graphics.Color
 import android.graphics.Matrix
+import android.graphics.drawable.GradientDrawable
 import android.net.Uri
 import android.os.Build
 import android.os.Bundle
 import android.os.Environment
 import android.provider.MediaStore
+import android.text.Editable
+import android.text.TextWatcher
 import android.util.Log
+import android.util.TypedValue
 import android.view.View
 import android.widget.SeekBar
+import android.widget.TextView
 import android.widget.Toast
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.appcompat.app.AppCompatActivity
@@ -27,6 +32,7 @@ import androidx.camera.core.Preview
 import androidx.camera.lifecycle.ProcessCameraProvider
 import androidx.core.content.ContextCompat
 import androidx.core.content.FileProvider
+import androidx.recyclerview.widget.LinearLayoutManager
 import com.google.mediapipe.framework.image.BitmapImageBuilder
 import com.google.mediapipe.tasks.core.BaseOptions
 import com.google.mediapipe.tasks.core.Delegate
@@ -46,6 +52,8 @@ class MainActivity : AppCompatActivity() {
     private lateinit var binding: ActivityMainBinding
     private var faceLandmarker: FaceLandmarker? = null
     private val analysisExecutor = Executors.newSingleThreadExecutor()
+    private lateinit var shadeAdapter: ShadeAdapter
+    private var activeBrand: String? = null   // null = "All"
 
     // --- Bitmap reuse pool to avoid per-frame allocation ---
     private var reusableBitmap: Bitmap? = null
@@ -81,7 +89,7 @@ class MainActivity : AppCompatActivity() {
             cameraPermissionLauncher.launch(Manifest.permission.CAMERA)
         }
 
-        setupColorButtons()
+        setupShadePicker()
         setupFinishToggle()
         setupLightingControls()
         setupCaptureShare()
@@ -182,35 +190,111 @@ class MainActivity : AppCompatActivity() {
         startActivity(Intent.createChooser(intent, "Share your look"))
     }
 
-    private fun setupColorButtons() {
-        // Cherry Crush
-        binding.btnColorRed.setOnClickListener {
-            binding.faceMeshOverlay.setLipColor(200, 30, 60)
-            highlightSelected(it, "Cherry Crush")
+    // ── Dynamic shade picker ──
+
+    private fun setupShadePicker() {
+        // RecyclerView
+        shadeAdapter = ShadeAdapter(ShadeCatalog.shades) { shade ->
+            applyShade(shade)
         }
-        // Rose Petal
-        binding.btnColorPink.setOnClickListener {
-            binding.faceMeshOverlay.setLipColor(220, 80, 120)
-            highlightSelected(it, "Rose Petal")
+        binding.shadeRecycler.layoutManager =
+            LinearLayoutManager(this, LinearLayoutManager.HORIZONTAL, false)
+        binding.shadeRecycler.adapter = shadeAdapter
+
+        // Brand filter chips
+        buildBrandChips()
+
+        // Search / HEX input
+        binding.shadeSearch.addTextChangedListener(object : TextWatcher {
+            override fun beforeTextChanged(s: CharSequence?, start: Int, count: Int, after: Int) {}
+            override fun onTextChanged(s: CharSequence?, start: Int, before: Int, count: Int) {}
+            override fun afterTextChanged(s: Editable?) {
+                filterShades(s?.toString().orEmpty())
+            }
+        })
+
+        // Apply first shade on launch
+        shadeAdapter.selectFirst()
+    }
+
+    private fun applyShade(shade: LipShade) {
+        binding.faceMeshOverlay.setLipColor(shade.r, shade.g, shade.b)
+        binding.shadeName.text = shade.name
+        binding.shadeBrand.text = shade.brand.ifEmpty { shade.hex }
+        // Also set glossy/matte from shade finish
+        if (shade.finish.equals("Glossy", true)) {
+            binding.faceMeshOverlay.isGlossy = true
+            binding.btnGlossy.setBackgroundResource(R.drawable.toggle_selected_bg)
+            binding.btnGlossy.setTextColor(Color.WHITE)
+            binding.btnMatte.background = null
+            binding.btnMatte.setTextColor(0x80FFFFFF.toInt())
         }
-        // Berry Noir
-        binding.btnColorBerry.setOnClickListener {
-            binding.faceMeshOverlay.setLipColor(140, 30, 100)
-            highlightSelected(it, "Berry Noir")
-        }
-        // Nude Silk
-        binding.btnColorNude.setOnClickListener {
-            binding.faceMeshOverlay.setLipColor(180, 110, 90)
-            highlightSelected(it, "Nude Silk")
-        }
-        // Sunset Coral
-        binding.btnColorOrange.setOnClickListener {
-            binding.faceMeshOverlay.setLipColor(220, 100, 50)
-            highlightSelected(it, "Sunset Coral")
+    }
+
+    private fun filterShades(query: String) {
+        val trimmed = query.trim()
+
+        // HEX code handling: if starts with # and length 7, create custom shade
+        if (trimmed.startsWith("#") && trimmed.length == 7) {
+            try {
+                val custom = ShadeCatalog.fromHex(trimmed, "Custom")
+                shadeAdapter.updateShades(listOf(custom) + ShadeCatalog.search(trimmed))
+                shadeAdapter.selectFirst()
+                return
+            } catch (_: Exception) { }
         }
 
-        // Default selection
-        highlightSelected(binding.btnColorRed)
+        // Normal search (filtered by active brand if set)
+        val base = if (activeBrand != null) ShadeCatalog.byBrand(activeBrand!!) else ShadeCatalog.shades
+        val results = if (trimmed.isEmpty()) base
+        else base.filter {
+            it.name.contains(trimmed, true) ||
+            it.brand.contains(trimmed, true) ||
+            it.hex.contains(trimmed, true)
+        }
+        shadeAdapter.updateShades(results)
+    }
+
+    private fun buildBrandChips() {
+        val container = binding.brandChipsRow
+        container.removeAllViews()
+
+        val allBrands = listOf("All") + ShadeCatalog.brands
+        val dp6 = TypedValue.applyDimension(TypedValue.COMPLEX_UNIT_DIP, 6f, resources.displayMetrics).toInt()
+        val dp12 = dp6 * 2
+        val chipViews = mutableListOf<TextView>()
+
+        for (brand in allBrands) {
+            val chip = TextView(this).apply {
+                text = brand
+                setTextColor(if (brand == "All") Color.WHITE else 0x90FFFFFF.toInt())
+                textSize = 12f
+                setPadding(dp12, dp6, dp12, dp6)
+                if (brand == "All") setBackgroundResource(R.drawable.toggle_selected_bg)
+                setOnClickListener { selectBrandChip(brand, chipViews) }
+            }
+            val lp = android.widget.LinearLayout.LayoutParams(
+                android.widget.LinearLayout.LayoutParams.WRAP_CONTENT,
+                android.widget.LinearLayout.LayoutParams.WRAP_CONTENT
+            ).apply { marginEnd = dp6 }
+            container.addView(chip, lp)
+            chipViews.add(chip)
+        }
+    }
+
+    private fun selectBrandChip(brand: String, chips: List<TextView>) {
+        activeBrand = if (brand == "All") null else brand
+        for (chip in chips) {
+            if (chip.text == brand) {
+                chip.setBackgroundResource(R.drawable.toggle_selected_bg)
+                chip.setTextColor(Color.WHITE)
+            } else {
+                chip.background = null
+                chip.setTextColor(0x90FFFFFF.toInt())
+            }
+        }
+        // Re-filter with current search query
+        filterShades(binding.shadeSearch.text?.toString().orEmpty())
     }
 
     private fun setupFinishToggle() {
@@ -262,26 +346,6 @@ class MainActivity : AppCompatActivity() {
         binding.btnCool.setOnClickListener { selectTone(0) }
         binding.btnNeutral.setOnClickListener { selectTone(1) }
         binding.btnWarm.setOnClickListener { selectTone(2) }
-    }
-
-    private var selectedView: android.view.View? = null
-
-    private fun highlightSelected(view: android.view.View, shadeName: String = "") {
-        // Reset previous
-        selectedView?.apply {
-            scaleX = 1.0f
-            scaleY = 1.0f
-            alpha = 0.7f
-        }
-        // Highlight current
-        view.scaleX = 1.3f
-        view.scaleY = 1.3f
-        view.alpha = 1.0f
-        selectedView = view
-        // Update shade name label
-        if (shadeName.isNotEmpty()) {
-            binding.shadeName.text = shadeName
-        }
     }
 
     private fun setupFaceLandmarker() {

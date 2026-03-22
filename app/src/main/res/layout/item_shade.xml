@@ -1,0 +1,36 @@
+<?xml version="1.0" encoding="utf-8"?>
+<LinearLayout xmlns:android="http://schemas.android.com/apk/res/android"
+    android:layout_width="72dp"
+    android:layout_height="wrap_content"
+    android:orientation="vertical"
+    android:gravity="center_horizontal"
+    android:padding="4dp">
+
+    <View
+        android:id="@+id/swatch"
+        android:layout_width="44dp"
+        android:layout_height="44dp" />
+
+    <TextView
+        android:id="@+id/shadeTitleItem"
+        android:layout_width="wrap_content"
+        android:layout_height="wrap_content"
+        android:text="Shade"
+        android:textColor="#FFFFFF"
+        android:textSize="9sp"
+        android:fontFamily="sans-serif-medium"
+        android:maxLines="1"
+        android:ellipsize="end"
+        android:layout_marginTop="4dp" />
+
+    <TextView
+        android:id="@+id/shadeBrandItem"
+        android:layout_width="wrap_content"
+        android:layout_height="wrap_content"
+        android:text="Brand"
+        android:textColor="#80FFFFFF"
+        android:textSize="8sp"
+        android:maxLines="1"
+        android:ellipsize="end" />
+
+</LinearLayout>
