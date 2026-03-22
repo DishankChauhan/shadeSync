@@ -19,6 +19,7 @@ import android.text.TextWatcher
 import android.util.Log
 import android.util.TypedValue
 import android.view.View
+import android.view.animation.AccelerateDecelerateInterpolator
 import android.widget.SeekBar
 import android.widget.TextView
 import android.widget.Toast
@@ -56,6 +57,7 @@ class MainActivity : AppCompatActivity() {
     private var activeBrand: String? = null   // null = "All"
     private var latestResult: FaceLandmarkerResult? = null
     private var recAdapter: ShadeAdapter? = null
+    private var panelExpanded = true   // bottom panel state
 
     // --- Bitmap reuse pool to avoid per-frame allocation ---
     private var reusableBitmap: Bitmap? = null
@@ -97,6 +99,7 @@ class MainActivity : AppCompatActivity() {
         setupCaptureShare()
         setupSkinAnalysis()
         setupLookPresets()
+        setupCollapsiblePanel()
     }
 
     // ── Save & Share ──
@@ -284,7 +287,7 @@ class MainActivity : AppCompatActivity() {
 
         // Apply lipstick
         val lip = preset.lipShade
-        binding.faceMeshOverlay.setLipColor(lip.r, lip.g, lip.b)
+        binding.lipGLView.setLipColor(lip.r, lip.g, lip.b)
         binding.shadeName.text = lip.name
         binding.shadeBrand.text = "${preset.emoji} ${preset.name}"
 
@@ -295,7 +298,7 @@ class MainActivity : AppCompatActivity() {
         binding.faceMeshOverlay.setSmoothing(preset.smoothing)
 
         // Apply finish
-        binding.faceMeshOverlay.isGlossy = preset.glossy
+        binding.lipGLView.isGlossy = preset.glossy
         if (preset.glossy) {
             binding.btnGlossy.setBackgroundResource(R.drawable.toggle_selected_bg)
             binding.btnGlossy.setTextColor(Color.WHITE)
@@ -309,14 +312,58 @@ class MainActivity : AppCompatActivity() {
         }
 
         // Apply brightness + tone
-        binding.faceMeshOverlay.brightness = preset.brightness
+        binding.lipGLView.brightness = preset.brightness
         binding.brightnessSlider.progress = ((preset.brightness - 0.3f) * 100f).toInt().coerceIn(0, 150)
-        binding.faceMeshOverlay.toneShift = preset.toneShift
+        binding.lipGLView.toneShift = preset.toneShift
 
         // Update active label
         binding.activePresetLabel.text = "${preset.emoji} ${preset.name}"
 
         Toast.makeText(this, "${preset.emoji} ${preset.name} applied!", Toast.LENGTH_SHORT).show()
+    }
+
+    // ── Collapsible bottom panel ──
+
+    private fun setupCollapsiblePanel() {
+        binding.panelHandle.setOnClickListener {
+            togglePanel()
+        }
+    }
+
+    private fun togglePanel() {
+        val content = binding.panelContent
+        val chevron = binding.panelChevron
+        val duration = 250L
+
+        if (panelExpanded) {
+            // Collapse — slide down and hide
+            content.animate()
+                .translationY(content.height.toFloat())
+                .alpha(0f)
+                .setDuration(duration)
+                .setInterpolator(AccelerateDecelerateInterpolator())
+                .withEndAction {
+                    content.visibility = View.GONE
+                    content.translationY = 0f
+                    content.alpha = 1f
+                }
+                .start()
+            chevron.text = "▲"
+            panelExpanded = false
+        } else {
+            // Expand — show and slide up
+            content.visibility = View.VISIBLE
+            content.alpha = 0f
+            content.translationY = content.height.toFloat()
+            content.animate()
+                .translationY(0f)
+                .alpha(1f)
+                .setDuration(duration)
+                .setInterpolator(AccelerateDecelerateInterpolator())
+                .start()
+            chevron.text = "▼"
+            panelExpanded = true
+        }
     }
 
     // ── Dynamic shade picker ──
@@ -347,12 +394,12 @@ class MainActivity : AppCompatActivity() {
     }
 
     private fun applyShade(shade: LipShade) {
-        binding.faceMeshOverlay.setLipColor(shade.r, shade.g, shade.b)
+        binding.lipGLView.setLipColor(shade.r, shade.g, shade.b)
         binding.shadeName.text = shade.name
         binding.shadeBrand.text = shade.brand.ifEmpty { shade.hex }
         // Also set glossy/matte from shade finish
         if (shade.finish.equals("Glossy", true)) {
-            binding.faceMeshOverlay.isGlossy = true
+            binding.lipGLView.isGlossy = true
             binding.btnGlossy.setBackgroundResource(R.drawable.toggle_selected_bg)
             binding.btnGlossy.setTextColor(Color.WHITE)
             binding.btnMatte.background = null
@@ -428,14 +475,14 @@ class MainActivity : AppCompatActivity() {
 
     private fun setupFinishToggle() {
         binding.btnGlossy.setOnClickListener {
-            binding.faceMeshOverlay.isGlossy = true
+            binding.lipGLView.isGlossy = true
             binding.btnGlossy.setBackgroundResource(R.drawable.toggle_selected_bg)
             binding.btnGlossy.setTextColor(Color.WHITE)
             binding.btnMatte.background = null
             binding.btnMatte.setTextColor(0x80FFFFFF.toInt())
         }
         binding.btnMatte.setOnClickListener {
-            binding.faceMeshOverlay.isGlossy = false
+            binding.lipGLView.isGlossy = false
             binding.btnMatte.setBackgroundResource(R.drawable.toggle_selected_bg)
             binding.btnMatte.setTextColor(Color.WHITE)
             binding.btnGlossy.background = null
@@ -449,7 +496,7 @@ class MainActivity : AppCompatActivity() {
         // Brightness slider: SeekBar 0–150 maps to 0.3–1.8
         binding.brightnessSlider.setOnSeekBarChangeListener(object : SeekBar.OnSeekBarChangeListener {
             override fun onProgressChanged(sb: SeekBar?, progress: Int, fromUser: Boolean) {
-                binding.faceMeshOverlay.brightness = 0.3f + progress / 100f
+                binding.lipGLView.brightness = 0.3f + progress / 100f
             }
             override fun onStartTrackingTouch(sb: SeekBar?) {}
             override fun onStopTrackingTouch(sb: SeekBar?) {}
@@ -460,7 +507,7 @@ class MainActivity : AppCompatActivity() {
         val toneValues = floatArrayOf(-0.7f, 0f, 0.7f)
 
         fun selectTone(idx: Int) {
-            binding.faceMeshOverlay.toneShift = toneValues[idx]
+            binding.lipGLView.toneShift = toneValues[idx]
             for (i in toneButtons.indices) {
                 if (i == idx) {
                     toneButtons[i].setBackgroundResource(R.drawable.toggle_selected_bg)
@@ -621,12 +668,14 @@ class MainActivity : AppCompatActivity() {
         runOnUiThread {
             if (result.faceLandmarks().isNotEmpty()) {
                 latestResult = result
+                binding.lipGLView.setResults(result, input.width, input.height)
                 binding.faceMeshOverlay.setResults(
                     result,
                     input.width,
                     input.height
                 )
             } else {
+                binding.lipGLView.clear()
                 binding.faceMeshOverlay.clear()
             }
         }

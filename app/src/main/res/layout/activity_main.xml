@@ -9,6 +9,11 @@
         android:layout_width="match_parent"
         android:layout_height="match_parent" />
 
+    <com.shadesync.app.LipGLSurfaceView
+        android:id="@+id/lipGLView"
+        android:layout_width="match_parent"
+        android:layout_height="match_parent" />
+
     <com.shadesync.app.FaceMeshOverlayView
         android:id="@+id/faceMeshOverlay"
         android:layout_width="match_parent"
@@ -190,13 +195,50 @@
 
     <!-- Bottom controls container -->
     <LinearLayout
+        android:id="@+id/bottomPanel"
         android:layout_width="match_parent"
         android:layout_height="wrap_content"
         android:layout_gravity="bottom"
         android:orientation="vertical"
         android:gravity="center_horizontal"
-        android:paddingTop="28dp"
+        android:paddingBottom="52dp"
         android:background="@drawable/bottom_bar_bg">
+
+        <!-- Drag handle / toggle button -->
+        <LinearLayout
+            android:id="@+id/panelHandle"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:orientation="vertical"
+            android:gravity="center_horizontal"
+            android:paddingTop="10dp"
+            android:paddingBottom="10dp">
+
+            <!-- Visual handle bar -->
+            <View
+                android:layout_width="40dp"
+                android:layout_height="4dp"
+                android:background="@drawable/toggle_bg" />
+
+            <!-- Chevron indicator -->
+            <TextView
+                android:id="@+id/panelChevron"
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:text="▼"
+                android:textColor="#70FFFFFF"
+                android:textSize="10sp"
+                android:layout_marginTop="2dp" />
+
+        </LinearLayout>
+
+        <!-- Collapsible content wrapper -->
+        <LinearLayout
+            android:id="@+id/panelContent"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:orientation="vertical"
+            android:gravity="center_horizontal">
 
         <!-- Look Presets toggle row -->
         <LinearLayout
@@ -491,6 +533,8 @@
             android:clipToPadding="false" />
 
         </LinearLayout>  <!-- end shadesPanel -->
+
+        </LinearLayout>  <!-- end panelContent -->
 
     </LinearLayout>
 

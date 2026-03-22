@@ -1,28 +1,15 @@
 package com.shadesync.app
 
 import android.content.Context
-import android.graphics.BlurMaskFilter
-import android.graphics.Canvas
-import android.graphics.Color
-import android.graphics.Paint
-import android.graphics.Path
+import android.graphics.*
 import android.util.AttributeSet
 import android.view.View
 import com.google.mediapipe.tasks.components.containers.NormalizedLandmark
 import com.google.mediapipe.tasks.vision.facelandmarker.FaceLandmarkerResult
 
 /**
- * Production AR overlay — multi-layer lipstick rendering with
- * texture blending, feathered edges, and gloss/matte toggle.
- *
- * Rendering pipeline (bottom → top):
- *   ① Edge feather 2 — wide soft colour fringe
- *   ② Edge feather 1 — tighter colour fringe
- *   ③ Base fill      — sheer, lets skin texture show through (~85 % transparent)
- *   ④ Core fill      — builds pigment density (~75 % transparent)
- *   ⑤ Depth stroke   — darkened contour edges for dimension
- *   ⑥ Gloss lower    — white specular band on lower lip  (glossy only)
- *   ⑦ Gloss upper    — white Cupid's bow highlight       (glossy only)
+ * AR overlay for blush and skin smoothing effects.
+ * Lip rendering is handled by LipGLSurfaceView (OpenGL ES 2.0).
  */
 class FaceMeshOverlayView @JvmOverloads constructor(
     context: Context,
@@ -41,9 +28,6 @@ class FaceMeshOverlayView @JvmOverloads constructor(
     private var lastViewW = 0; private var lastViewH = 0
     private var lastImgW = 0;  private var lastImgH = 0
 
-    // ── Lip colour state ──
-    private var lipR = 200; private var lipG = 30; private var lipB = 60
-
     // ── Blush state ──
     private var blushR = 210; private var blushG = 100; private var blushB = 110
     private var blushAlpha = 0f   // 0 = off, 1 = full
@@ -51,54 +35,11 @@ class FaceMeshOverlayView @JvmOverloads constructor(
     // ── Skin smoothing state ──
     private var smoothingLevel = 0f   // 0 = off, 1 = max
 
-    /** Switch between glossy (specular highlights) and matte (higher pigment, no shine). */
-    var isGlossy: Boolean = true
-        set(value) { field = value; invalidate() }
-
-    /** Brightness multiplier: 0.0 = black, 1.0 = original, 2.0 = double bright. */
-    var brightness: Float = 1.0f
-        set(value) { field = value.coerceIn(0.3f, 1.8f); applyColourToPaints(); invalidate() }
-
-    /** Tone shift: -1.0 = full cool (blue bias), 0 = neutral, +1.0 = full warm (orange bias). */
-    var toneShift: Float = 0f
-        set(value) { field = value.coerceIn(-1f, 1f); applyColourToPaints(); invalidate() }
-
-    // ──────────── Paint objects ────────────
-    // Layer 1 — sheer base (skin texture visible through low alpha)
-    private val lipBasePaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
-        style = Paint.Style.FILL
-    }
-    // Layer 2 — core colour
-    private val lipCorePaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
-        style = Paint.Style.FILL
-    }
-    // Depth— darkened contour stroke for 3-D edge definition
-    private val lipDepthPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
-        style = Paint.Style.STROKE; strokeWidth = 3f
-        maskFilter = BlurMaskFilter(4f, BlurMaskFilter.Blur.NORMAL)
-    }
-    // Edge feather ring 1 — tight
-    private val edgeFeather1 = Paint(Paint.ANTI_ALIAS_FLAG).apply {
-        style = Paint.Style.STROKE; strokeWidth = 5f
-        maskFilter = BlurMaskFilter(8f, BlurMaskFilter.Blur.NORMAL)
-    }
-    // Edge feather ring 2 — wide, very soft
-    private val edgeFeather2 = Paint(Paint.ANTI_ALIAS_FLAG).apply {
-        style = Paint.Style.STROKE; strokeWidth = 10f
-        maskFilter = BlurMaskFilter(14f, BlurMaskFilter.Blur.NORMAL)
-    }
-    // Gloss — lower lip specular highlight
-    private val glossLowerPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
-        style = Paint.Style.STROKE; strokeWidth = 6f; strokeCap = Paint.Cap.ROUND
-        color = Color.argb(65, 255, 255, 255)
-        maskFilter = BlurMaskFilter(5f, BlurMaskFilter.Blur.NORMAL)
-    }
-    // Gloss — Cupid's-bow highlight
-    private val glossUpperPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
-        style = Paint.Style.STROKE; strokeWidth = 4f; strokeCap = Paint.Cap.ROUND
-        color = Color.argb(40, 255, 255, 255)
-        maskFilter = BlurMaskFilter(4f, BlurMaskFilter.Blur.NORMAL)
-    }
+    // ── Temporal smoothing for stable landmark tracking ──
+    private var smoothedX = FloatArray(478)
+    private var smoothedY = FloatArray(478)
+    private var hasSmoothedData = false
+    private val SMOOTH_FACTOR = 0.45f
 
     // ── Blush paints ──
     private val blushPaint1 = Paint(Paint.ANTI_ALIAS_FLAG).apply {
@@ -116,18 +57,12 @@ class FaceMeshOverlayView @JvmOverloads constructor(
     }
 
     // ── Pre-allocated Paths (reset each frame) ──
-    private val upperLipPath = Path()
-    private val lowerLipPath = Path()
-    private val outerPath    = Path()
-    private val glossLowerPath = Path()
-    private val glossUpperPath = Path()
     private val leftCheekPath  = Path()
     private val rightCheekPath = Path()
     private val facePath = Path()
 
     init {
         setLayerType(LAYER_TYPE_SOFTWARE, null)   // required for BlurMaskFilter
-        applyColourToPaints()
         updateBlushPaint()
     }
 
@@ -139,12 +74,6 @@ class FaceMeshOverlayView @JvmOverloads constructor(
     }
 
     // ──────────── Public API ────────────
-
-    fun setLipColor(r: Int, g: Int, b: Int) {
-        lipR = r; lipG = g; lipB = b
-        applyColourToPaints()
-        invalidate()
-    }
 
     /** Set blush colour and intensity (0–1). Pass intensity=0 to disable. */
     fun setBlush(r: Int, g: Int, b: Int, intensity: Float) {
@@ -171,24 +100,11 @@ class FaceMeshOverlayView @JvmOverloads constructor(
         invalidate()
     }
 
-    fun clear() { result = null; invalidate() }
+    fun clear() { result = null; hasSmoothedData = false; invalidate() }
 
     // ──────────── Landmark index sets ────────────
 
     companion object {
-        val LIPS_OUTER = intArrayOf(
-            61, 146, 91, 181, 84, 17, 314, 405, 321, 375,
-            291, 409, 270, 269, 267, 0, 37, 39, 40, 185, 61
-        )
-        val UPPER_LIP_TOP = intArrayOf(61, 185, 40, 39, 37, 0, 267, 269, 270, 409, 291)
-        val UPPER_LIP_BTM = intArrayOf(291, 308, 324, 318, 402, 317, 14, 87, 178, 88, 95, 78, 61)
-        val LOWER_LIP_TOP = intArrayOf(61, 146, 91, 181, 84, 17, 314, 405, 321, 375, 291)
-        val LOWER_LIP_BTM = intArrayOf(291, 308, 415, 310, 311, 312, 13, 82, 81, 80, 191, 78, 61)
-
-        // Gloss highlight curves
-        val GLOSS_LOWER = intArrayOf(80, 81, 82, 13, 312, 311, 310)   // inner lower-lip ridge
-        val GLOSS_UPPER = intArrayOf(88, 178, 87, 14, 317, 402, 318)  // Cupid's bow ridge
-
         // Cheek blush regions (apple of cheeks)
         val LEFT_CHEEK  = intArrayOf(50, 101, 118, 117, 111, 100, 36, 205, 187, 123, 116, 50)
         val RIGHT_CHEEK = intArrayOf(280, 330, 347, 346, 340, 329, 266, 425, 411, 352, 345, 280)
@@ -202,42 +118,6 @@ class FaceMeshOverlayView @JvmOverloads constructor(
     }
 
     // ──────────── Internal helpers ────────────
-
-    /**
-     * Apply brightness + tone shift to the base lipR/G/B, then push
-     * the adjusted colour into every paint.
-     */
-    private fun applyColourToPaints() {
-        // 1. Brightness
-        var r = (lipR * brightness).toInt()
-        var g = (lipG * brightness).toInt()
-        var b = (lipB * brightness).toInt()
-
-        // 2. Tone shift — warm pushes toward orange, cool toward blue
-        if (toneShift > 0f) {            // warm
-            r = (r + 30 * toneShift).toInt()
-            g = (g + 8 * toneShift).toInt()
-            b = (b - 20 * toneShift).toInt()
-        } else if (toneShift < 0f) {     // cool
-            val t = -toneShift
-            r = (r - 20 * t).toInt()
-            g = (g + 4 * t).toInt()
-            b = (b + 25 * t).toInt()
-        }
-
-        r = r.coerceIn(0, 255)
-        g = g.coerceIn(0, 255)
-        b = b.coerceIn(0, 255)
-
-        lipBasePaint.color  = Color.argb(38, r, g, b)
-        lipCorePaint.color  = Color.argb(58, r, g, b)
-        lipDepthPaint.color = Color.argb(30,
-            (r * 0.55f).toInt().coerceIn(0, 255),
-            (g * 0.35f).toInt().coerceIn(0, 255),
-            (b * 0.35f).toInt().coerceIn(0, 255))
-        edgeFeather1.color  = Color.argb(35, r, g, b)
-        edgeFeather2.color  = Color.argb(15, r, g, b)
-    }
 
     /** Compute FILL_CENTER scale + offset so landmarks match the PreviewView. */
     private fun updateTransform() {
@@ -266,22 +146,18 @@ class FaceMeshOverlayView @JvmOverloads constructor(
         val lm = res.faceLandmarks()[0]
         updateTransform()
 
-        // Adjust per-frame alphas based on finish mode
-        if (isGlossy) {
-            lipBasePaint.alpha = 38;  lipCorePaint.alpha = 58
-            edgeFeather1.alpha = 35;  edgeFeather2.alpha = 15
-        } else {                       // matte — higher pigment, tighter edge
-            lipBasePaint.alpha = 55;  lipCorePaint.alpha = 82
-            edgeFeather1.alpha = 28;  edgeFeather2.alpha = 10
+        // Initialise temporal smoothing on first frame
+        if (!hasSmoothedData) {
+            for (i in 0 until minOf(lm.size, 478)) {
+                smoothedX[i] = lm[i].x(); smoothedY[i] = lm[i].y()
+            }
+            hasSmoothedData = true
         }
 
         // ── Skin smoothing (drawn first, under everything) ──
         if (smoothingLevel > 0.05f) {
-            facePath.reset()
-            pathFromIndices(facePath, lm, FACE_OVAL)
-            facePath.close()
+            facePath.reset(); pathFromIndices(facePath, lm, FACE_OVAL); facePath.close()
             val sAlpha = (smoothingLevel * 30).toInt().coerceIn(0, 60)
-            // Use skin-approximating colour (neutral warm)
             smoothPaint.color = Color.argb(sAlpha, 220, 195, 175)
             smoothPaint.maskFilter = BlurMaskFilter(24f + smoothingLevel * 16f, BlurMaskFilter.Blur.NORMAL)
             canvas.drawPath(facePath, smoothPaint)
@@ -289,61 +165,30 @@ class FaceMeshOverlayView @JvmOverloads constructor(
 
         // ── Blush ──
         if (blushAlpha > 0.05f) {
-            leftCheekPath.reset()
-            pathFromIndices(leftCheekPath, lm, LEFT_CHEEK)
-            leftCheekPath.close()
-            rightCheekPath.reset()
-            pathFromIndices(rightCheekPath, lm, RIGHT_CHEEK)
-            rightCheekPath.close()
-            // Outer diffuse layer
-            canvas.drawPath(leftCheekPath, blushPaint1)
-            canvas.drawPath(rightCheekPath, blushPaint1)
-            // Inner concentrated layer
-            canvas.drawPath(leftCheekPath, blushPaint2)
-            canvas.drawPath(rightCheekPath, blushPaint2)
-        }
-
-        // Build reusable paths
-        upperLipPath.reset();   bandPath(upperLipPath, lm, UPPER_LIP_TOP, UPPER_LIP_BTM)
-        lowerLipPath.reset();   bandPath(lowerLipPath, lm, LOWER_LIP_TOP, LOWER_LIP_BTM)
-        outerPath.reset();      pathFromIndices(outerPath, lm, LIPS_OUTER)
-
-        // ① + ② Edge feathering (soft outer glow — draws under everything)
-        canvas.drawPath(outerPath, edgeFeather2)
-        canvas.drawPath(outerPath, edgeFeather1)
-
-        // ③ Sheer base (skin texture bleeds through)
-        canvas.drawPath(upperLipPath, lipBasePaint)
-        canvas.drawPath(lowerLipPath, lipBasePaint)
-
-        // ④ Core colour build-up
-        canvas.drawPath(upperLipPath, lipCorePaint)
-        canvas.drawPath(lowerLipPath, lipCorePaint)
-
-        // ⑤ Depth contour (darkened edge for 3-D shape)
-        canvas.drawPath(outerPath, lipDepthPaint)
-
-        // ⑥ + ⑦ Gloss highlights
-        if (isGlossy) {
-            glossLowerPath.reset()
-            pathFromIndices(glossLowerPath, lm, GLOSS_LOWER)
-            canvas.drawPath(glossLowerPath, glossLowerPaint)
-
-            glossUpperPath.reset()
-            pathFromIndices(glossUpperPath, lm, GLOSS_UPPER)
-            canvas.drawPath(glossUpperPath, glossUpperPaint)
+            leftCheekPath.reset(); pathFromIndices(leftCheekPath, lm, LEFT_CHEEK); leftCheekPath.close()
+            rightCheekPath.reset(); pathFromIndices(rightCheekPath, lm, RIGHT_CHEEK); rightCheekPath.close()
+            canvas.drawPath(leftCheekPath, blushPaint1);  canvas.drawPath(rightCheekPath, blushPaint1)
+            canvas.drawPath(leftCheekPath, blushPaint2);  canvas.drawPath(rightCheekPath, blushPaint2)
         }
     }
 
+    // ──────────── Path helpers ────────────
+
+    /** Apply temporal smoothing to a landmark and return screen-space coords. */
+    private fun smoothedPoint(index: Int, lm: List<NormalizedLandmark>): Pair<Float, Float> {
+        val rawX = lm[index].x(); val rawY = lm[index].y()
+        smoothedX[index] += SMOOTH_FACTOR * (rawX - smoothedX[index])
+        smoothedY[index] += SMOOTH_FACTOR * (rawY - smoothedY[index])
+        return Pair(sx(smoothedX[index]), sy(smoothedY[index]))
+    }
+
+    /** Simple linear path from landmark indices (for blush, face oval). */
     private fun pathFromIndices(path: Path, lm: List<NormalizedLandmark>, idx: IntArray) {
-        var p = lm[idx[0]]; path.moveTo(sx(p.x()), sy(p.y()))
-        for (i in 1 until idx.size) { p = lm[idx[i]]; path.lineTo(sx(p.x()), sy(p.y())) }
-    }
-
-    private fun bandPath(path: Path, lm: List<NormalizedLandmark>, outer: IntArray, inner: IntArray) {
-        var p = lm[outer[0]]; path.moveTo(sx(p.x()), sy(p.y()))
-        for (i in 1 until outer.size) { p = lm[outer[i]]; path.lineTo(sx(p.x()), sy(p.y())) }
-        for (idx in inner) { p = lm[idx]; path.lineTo(sx(p.x()), sy(p.y())) }
-        path.close()
+        val p0 = smoothedPoint(idx[0], lm)
+        path.moveTo(p0.first, p0.second)
+        for (i in 1 until idx.size) {
+            val p = smoothedPoint(idx[i], lm)
+            path.lineTo(p.first, p.second)
+        }
     }
 }
