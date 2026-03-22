@@ -35,19 +35,42 @@ class FaceMeshOverlayView @JvmOverloads constructor(
         isAntiAlias = true
     }
 
-    // Lipstick fill paint — semi-transparent red
+    // Current lip color (ARGB components)
+    private var lipR = 200
+    private var lipG = 30
+    private var lipB = 60
+    private var lipAlpha = 100
+
+    // Lipstick fill paint
     private val lipFillPaint = Paint().apply {
-        color = Color.argb(100, 200, 30, 60)
+        color = Color.argb(lipAlpha, lipR, lipG, lipB)
         style = Paint.Style.FILL
         isAntiAlias = true
     }
 
     // Lip edge softening paint
     private val lipEdgePaint = Paint().apply {
-        color = Color.argb(60, 200, 30, 60)
+        color = Color.argb(60, lipR, lipG, lipB)
         style = Paint.Style.STROKE
         strokeWidth = 4f
         isAntiAlias = true
+    }
+
+    /**
+     * Change the lipstick color at runtime.
+     * @param r Red (0-255)
+     * @param g Green (0-255)
+     * @param b Blue (0-255)
+     * @param alpha Opacity (0-255), default 100 for a natural look
+     */
+    fun setLipColor(r: Int, g: Int, b: Int, alpha: Int = 100) {
+        lipR = r
+        lipG = g
+        lipB = b
+        lipAlpha = alpha
+        lipFillPaint.color = Color.argb(alpha, r, g, b)
+        lipEdgePaint.color = Color.argb(alpha / 2, r, g, b)
+        invalidate()
     }
 
     // Paint used to cut out the inner mouth opening

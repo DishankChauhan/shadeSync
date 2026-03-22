@@ -58,6 +58,55 @@ class MainActivity : AppCompatActivity() {
         } else {
             cameraPermissionLauncher.launch(Manifest.permission.CAMERA)
         }
+
+        setupColorButtons()
+    }
+
+    private fun setupColorButtons() {
+        // Classic Red
+        binding.btnColorRed.setOnClickListener {
+            binding.faceMeshOverlay.setLipColor(200, 30, 60)
+            highlightSelected(it)
+        }
+        // Rose Pink
+        binding.btnColorPink.setOnClickListener {
+            binding.faceMeshOverlay.setLipColor(220, 80, 120)
+            highlightSelected(it)
+        }
+        // Berry / Plum
+        binding.btnColorBerry.setOnClickListener {
+            binding.faceMeshOverlay.setLipColor(140, 30, 100)
+            highlightSelected(it)
+        }
+        // Nude / MLBB
+        binding.btnColorNude.setOnClickListener {
+            binding.faceMeshOverlay.setLipColor(180, 110, 90)
+            highlightSelected(it)
+        }
+        // Coral Orange
+        binding.btnColorOrange.setOnClickListener {
+            binding.faceMeshOverlay.setLipColor(220, 100, 50)
+            highlightSelected(it)
+        }
+
+        // Default selection
+        highlightSelected(binding.btnColorRed)
+    }
+
+    private var selectedView: android.view.View? = null
+
+    private fun highlightSelected(view: android.view.View) {
+        // Reset previous
+        selectedView?.apply {
+            scaleX = 1.0f
+            scaleY = 1.0f
+            alpha = 0.7f
+        }
+        // Highlight current
+        view.scaleX = 1.3f
+        view.scaleY = 1.3f
+        view.alpha = 1.0f
+        selectedView = view
     }
 
     private fun setupFaceLandmarker() {
