@@ -1,0 +1,4 @@
+<resources>
+    <string name="app_name">ShadeSync</string>
+    <string name="camera_permission_required">Camera permission is required to use this app.</string>
+</resources>
