@@ -81,16 +81,28 @@ class MainActivity : AppCompatActivity() {
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
-        binding = ActivityMainBinding.inflate(layoutInflater)
-        setContentView(binding.root)
 
-        setupShadePicker()
-        setupFinishToggle()
-        setupLightingControls()
-        setupCaptureShare()
-        setupSkinAnalysis()
-        setupLookPresets()
-        setupCollapsiblePanel()
+        try {
+            binding = ActivityMainBinding.inflate(layoutInflater)
+            setContentView(binding.root)
+        } catch (e: Exception) {
+            Log.e(TAG, "Layout inflation failed", e)
+            Toast.makeText(this, "Failed to initialize UI: ${e.message}", Toast.LENGTH_LONG).show()
+            finish()
+            return
+        }
+
+        try {
+            setupShadePicker()
+            setupFinishToggle()
+            setupLightingControls()
+            setupCaptureShare()
+            setupSkinAnalysis()
+            setupLookPresets()
+            setupCollapsiblePanel()
+        } catch (e: Exception) {
+            Log.e(TAG, "UI setup failed", e)
+        }
 
         // Delay camera init until views are attached to the window
         // (avoids NPE on View.getDisplay() which can be null before attachment)

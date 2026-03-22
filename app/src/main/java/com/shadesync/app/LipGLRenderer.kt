@@ -31,49 +31,62 @@ class LipGLSurfaceView @JvmOverloads constructor(
 ) : GLSurfaceView(context, attrs) {
 
     private val renderer = LipMeshRenderer()
+    private var glReady = false
 
     init {
-        setEGLContextClientVersion(2)
         try {
-            setEGLConfigChooser(8, 8, 8, 8, 16, 0)
+            setEGLContextClientVersion(2)
+            try {
+                setEGLConfigChooser(8, 8, 8, 8, 16, 0)
+            } catch (e: Exception) {
+                try {
+                    setEGLConfigChooser(8, 8, 8, 8, 0, 0)
+                } catch (e2: Exception) {
+                    // Let the system pick any config
+                }
+            }
+            holder.setFormat(PixelFormat.TRANSLUCENT)
+            setRenderer(renderer)
+            renderMode = RENDERMODE_WHEN_DIRTY
+            setZOrderMediaOverlay(true)
+            glReady = true
         } catch (e: Exception) {
-            // Fallback: let GLSurfaceView pick a default config
-            setEGLConfigChooser(8, 8, 8, 8, 0, 0)
+            android.util.Log.e("LipGLView", "OpenGL init failed: ${e.message}", e)
+            // View will remain but do nothing — app won't crash
         }
-        holder.setFormat(PixelFormat.TRANSLUCENT)
-        setRenderer(renderer)
-        renderMode = RENDERMODE_WHEN_DIRTY
-        setZOrderMediaOverlay(true)
     }
 
     // ── Public API (mirrors FaceMeshOverlayView interface) ──
 
     fun setResults(result: FaceLandmarkerResult, imgW: Int, imgH: Int) {
+        if (!glReady) return
         renderer.updateLandmarks(result, imgW, imgH, width, height)
         requestRender()
     }
 
     fun clear() {
+        if (!glReady) return
         renderer.clearLandmarks()
         requestRender()
     }
 
     fun setLipColor(r: Int, g: Int, b: Int) {
+        if (!glReady) return
         renderer.setColor(r, g, b)
         requestRender()
     }
 
     var isGlossy: Boolean
-        get() = renderer.glossy
-        set(value) { renderer.glossy = value; requestRender() }
+        get() = if (glReady) renderer.glossy else true
+        set(value) { if (glReady) { renderer.glossy = value; requestRender() } }
 
     var brightness: Float
-        get() = renderer.brightness
-        set(value) { renderer.brightness = value.coerceIn(0.3f, 1.8f); requestRender() }
+        get() = if (glReady) renderer.brightness else 1.0f
+        set(value) { if (glReady) { renderer.brightness = value.coerceIn(0.3f, 1.8f); requestRender() } }
 
     var toneShift: Float
-        get() = renderer.toneShift
-        set(value) { renderer.toneShift = value.coerceIn(-1f, 1f); requestRender() }
+        get() = if (glReady) renderer.toneShift else 0f
+        set(value) { if (glReady) { renderer.toneShift = value.coerceIn(-1f, 1f); requestRender() } }
 }
 
 // ═══════════════════════════════════════════════════════════════
