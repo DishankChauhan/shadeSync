@@ -1,12 +1,20 @@
 package com.shadesync.app
 
 import android.Manifest
+import android.content.ContentValues
+import android.content.Intent
 import android.content.pm.PackageManager
 import android.graphics.Bitmap
+import android.graphics.Canvas
 import android.graphics.Color
 import android.graphics.Matrix
+import android.net.Uri
+import android.os.Build
 import android.os.Bundle
+import android.os.Environment
+import android.provider.MediaStore
 import android.util.Log
+import android.view.View
 import android.widget.SeekBar
 import android.widget.Toast
 import androidx.activity.result.contract.ActivityResultContracts
@@ -18,6 +26,7 @@ import androidx.camera.core.ImageProxy
 import androidx.camera.core.Preview
 import androidx.camera.lifecycle.ProcessCameraProvider
 import androidx.core.content.ContextCompat
+import androidx.core.content.FileProvider
 import com.google.mediapipe.framework.image.BitmapImageBuilder
 import com.google.mediapipe.tasks.core.BaseOptions
 import com.google.mediapipe.tasks.core.Delegate
@@ -25,6 +34,11 @@ import com.google.mediapipe.tasks.vision.core.RunningMode
 import com.google.mediapipe.tasks.vision.facelandmarker.FaceLandmarker
 import com.google.mediapipe.tasks.vision.facelandmarker.FaceLandmarkerResult
 import com.shadesync.app.databinding.ActivityMainBinding
+import java.io.File
+import java.io.FileOutputStream
+import java.text.SimpleDateFormat
+import java.util.Date
+import java.util.Locale
 import java.util.concurrent.Executors
 
 class MainActivity : AppCompatActivity() {
@@ -70,6 +84,102 @@ class MainActivity : AppCompatActivity() {
         setupColorButtons()
         setupFinishToggle()
         setupLightingControls()
+        setupCaptureShare()
+    }
+
+    // ── Save & Share ──
+
+    private var lastSavedUri: Uri? = null
+
+    private fun setupCaptureShare() {
+        binding.btnCapture.setOnClickListener { captureAndSave() }
+        binding.btnShare.setOnClickListener {
+            val uri = lastSavedUri
+            if (uri != null) {
+                shareImage(uri)
+            } else {
+                captureAndSave(thenShare = true)
+            }
+        }
+    }
+
+    private fun captureAndSave(thenShare: Boolean = false) {
+        // Get the actual camera frame from PreviewView (not draw() which is blank)
+        val cameraBitmap = binding.previewView.bitmap
+        if (cameraBitmap == null) {
+            Toast.makeText(this, "Camera not ready", Toast.LENGTH_SHORT).show()
+            return
+        }
+
+        // Draw camera frame + overlay onto a single composite bitmap
+        val bitmap = cameraBitmap.copy(Bitmap.Config.ARGB_8888, true)
+        val canvas = Canvas(bitmap)
+
+        // Scale overlay to match the camera bitmap dimensions
+        val scaleX = bitmap.width.toFloat() / binding.faceMeshOverlay.width
+        val scaleY = bitmap.height.toFloat() / binding.faceMeshOverlay.height
+        canvas.save()
+        canvas.scale(scaleX, scaleY)
+        binding.faceMeshOverlay.draw(canvas)
+        canvas.restore()
+
+        // Add watermark
+        val wmPaint = android.graphics.Paint(android.graphics.Paint.ANTI_ALIAS_FLAG).apply {
+            color = Color.argb(120, 255, 255, 255)
+            textSize = 36f
+            typeface = android.graphics.Typeface.create("sans-serif-medium", android.graphics.Typeface.NORMAL)
+        }
+        val shadeTxt = binding.shadeName.text.toString()
+        canvas.drawText("ShadeSync · $shadeTxt", 24f, bitmap.height - 32f, wmPaint)
+
+        // Save to gallery via MediaStore (API 29+) or legacy file
+        val uri = saveBitmapToGallery(bitmap)
+        if (uri != null) {
+            lastSavedUri = uri
+            Toast.makeText(this, "Saved to gallery ✓", Toast.LENGTH_SHORT).show()
+            if (thenShare) shareImage(uri)
+        } else {
+            Toast.makeText(this, "Save failed", Toast.LENGTH_SHORT).show()
+        }
+    }
+
+    private fun saveBitmapToGallery(bitmap: Bitmap): Uri? {
+        val filename = "ShadeSync_" + SimpleDateFormat("yyyyMMdd_HHmmss", Locale.US).format(Date()) + ".png"
+
+        return if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q) {
+            val values = ContentValues().apply {
+                put(MediaStore.Images.Media.DISPLAY_NAME, filename)
+                put(MediaStore.Images.Media.MIME_TYPE, "image/png")
+                put(MediaStore.Images.Media.RELATIVE_PATH, Environment.DIRECTORY_PICTURES + "/ShadeSync")
+                put(MediaStore.Images.Media.IS_PENDING, 1)
+            }
+            val uri = contentResolver.insert(MediaStore.Images.Media.EXTERNAL_CONTENT_URI, values)
+            uri?.let {
+                contentResolver.openOutputStream(it)?.use { os ->
+                    bitmap.compress(Bitmap.CompressFormat.PNG, 100, os)
+                }
+                values.clear()
+                values.put(MediaStore.Images.Media.IS_PENDING, 0)
+                contentResolver.update(it, values, null, null)
+            }
+            uri
+        } else {
+            // Legacy: save to cache, return FileProvider URI
+            val file = File(cacheDir, filename)
+            FileOutputStream(file).use { bitmap.compress(Bitmap.CompressFormat.PNG, 100, it) }
+            FileProvider.getUriForFile(this, "$packageName.fileprovider", file)
+        }
+    }
+
+    private fun shareImage(uri: Uri) {
+        val shadeTxt = binding.shadeName.text.toString()
+        val intent = Intent(Intent.ACTION_SEND).apply {
+            type = "image/png"
+            putExtra(Intent.EXTRA_STREAM, uri)
+            putExtra(Intent.EXTRA_TEXT, "Trying on \"$shadeTxt\" with ShadeSync \uD83D\uDC84\nhttps://github.com/DishankChauhan/shadeSync")
+            addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION)
+        }
+        startActivity(Intent.createChooser(intent, "Share your look"))
     }
 
     private fun setupColorButtons() {
