@@ -44,6 +44,13 @@ class FaceMeshOverlayView @JvmOverloads constructor(
     // ── Lip colour state ──
     private var lipR = 200; private var lipG = 30; private var lipB = 60
 
+    // ── Blush state ──
+    private var blushR = 210; private var blushG = 100; private var blushB = 110
+    private var blushAlpha = 0f   // 0 = off, 1 = full
+
+    // ── Skin smoothing state ──
+    private var smoothingLevel = 0f   // 0 = off, 1 = max
+
     /** Switch between glossy (specular highlights) and matte (higher pigment, no shine). */
     var isGlossy: Boolean = true
         set(value) { field = value; invalidate() }
@@ -93,16 +100,42 @@ class FaceMeshOverlayView @JvmOverloads constructor(
         maskFilter = BlurMaskFilter(4f, BlurMaskFilter.Blur.NORMAL)
     }
 
+    // ── Blush paints ──
+    private val blushPaint1 = Paint(Paint.ANTI_ALIAS_FLAG).apply {
+        style = Paint.Style.FILL
+        maskFilter = BlurMaskFilter(28f, BlurMaskFilter.Blur.NORMAL)
+    }
+    private val blushPaint2 = Paint(Paint.ANTI_ALIAS_FLAG).apply {
+        style = Paint.Style.FILL
+        maskFilter = BlurMaskFilter(18f, BlurMaskFilter.Blur.NORMAL)
+    }
+
+    // ── Skin smoothing paint ──
+    private val smoothPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
+        style = Paint.Style.FILL
+    }
+
     // ── Pre-allocated Paths (reset each frame) ──
     private val upperLipPath = Path()
     private val lowerLipPath = Path()
     private val outerPath    = Path()
     private val glossLowerPath = Path()
     private val glossUpperPath = Path()
+    private val leftCheekPath  = Path()
+    private val rightCheekPath = Path()
+    private val facePath = Path()
 
     init {
         setLayerType(LAYER_TYPE_SOFTWARE, null)   // required for BlurMaskFilter
         applyColourToPaints()
+        updateBlushPaint()
+    }
+
+    private fun updateBlushPaint() {
+        val a1 = (blushAlpha * 28).toInt().coerceIn(0, 255)
+        val a2 = (blushAlpha * 18).toInt().coerceIn(0, 255)
+        blushPaint1.color = Color.argb(a1, blushR, blushG, blushB)
+        blushPaint2.color = Color.argb(a2, blushR, blushG, blushB)
     }
 
     // ──────────── Public API ────────────
@@ -110,6 +143,20 @@ class FaceMeshOverlayView @JvmOverloads constructor(
     fun setLipColor(r: Int, g: Int, b: Int) {
         lipR = r; lipG = g; lipB = b
         applyColourToPaints()
+        invalidate()
+    }
+
+    /** Set blush colour and intensity (0–1). Pass intensity=0 to disable. */
+    fun setBlush(r: Int, g: Int, b: Int, intensity: Float) {
+        blushR = r; blushG = g; blushB = b
+        blushAlpha = intensity.coerceIn(0f, 1f)
+        updateBlushPaint()
+        invalidate()
+    }
+
+    /** Set skin smoothing level (0 = off, 1 = max glass-skin). */
+    fun setSmoothing(level: Float) {
+        smoothingLevel = level.coerceIn(0f, 1f)
         invalidate()
     }
 
@@ -141,6 +188,17 @@ class FaceMeshOverlayView @JvmOverloads constructor(
         // Gloss highlight curves
         val GLOSS_LOWER = intArrayOf(80, 81, 82, 13, 312, 311, 310)   // inner lower-lip ridge
         val GLOSS_UPPER = intArrayOf(88, 178, 87, 14, 317, 402, 318)  // Cupid's bow ridge
+
+        // Cheek blush regions (apple of cheeks)
+        val LEFT_CHEEK  = intArrayOf(50, 101, 118, 117, 111, 100, 36, 205, 187, 123, 116, 50)
+        val RIGHT_CHEEK = intArrayOf(280, 330, 347, 346, 340, 329, 266, 425, 411, 352, 345, 280)
+
+        // Face outline for smoothing overlay
+        val FACE_OVAL = intArrayOf(
+            10, 338, 297, 332, 284, 251, 389, 356, 454, 323, 361, 288,
+            397, 365, 379, 378, 400, 377, 152, 148, 176, 149, 150, 136,
+            172, 58, 132, 93, 234, 127, 162, 21, 54, 103, 67, 109, 10
+        )
     }
 
     // ──────────── Internal helpers ────────────
@@ -215,6 +273,34 @@ class FaceMeshOverlayView @JvmOverloads constructor(
         } else {                       // matte — higher pigment, tighter edge
             lipBasePaint.alpha = 55;  lipCorePaint.alpha = 82
             edgeFeather1.alpha = 28;  edgeFeather2.alpha = 10
+        }
+
+        // ── Skin smoothing (drawn first, under everything) ──
+        if (smoothingLevel > 0.05f) {
+            facePath.reset()
+            pathFromIndices(facePath, lm, FACE_OVAL)
+            facePath.close()
+            val sAlpha = (smoothingLevel * 30).toInt().coerceIn(0, 60)
+            // Use skin-approximating colour (neutral warm)
+            smoothPaint.color = Color.argb(sAlpha, 220, 195, 175)
+            smoothPaint.maskFilter = BlurMaskFilter(24f + smoothingLevel * 16f, BlurMaskFilter.Blur.NORMAL)
+            canvas.drawPath(facePath, smoothPaint)
+        }
+
+        // ── Blush ──
+        if (blushAlpha > 0.05f) {
+            leftCheekPath.reset()
+            pathFromIndices(leftCheekPath, lm, LEFT_CHEEK)
+            leftCheekPath.close()
+            rightCheekPath.reset()
+            pathFromIndices(rightCheekPath, lm, RIGHT_CHEEK)
+            rightCheekPath.close()
+            // Outer diffuse layer
+            canvas.drawPath(leftCheekPath, blushPaint1)
+            canvas.drawPath(rightCheekPath, blushPaint1)
+            // Inner concentrated layer
+            canvas.drawPath(leftCheekPath, blushPaint2)
+            canvas.drawPath(rightCheekPath, blushPaint2)
         }
 
         // Build reusable paths

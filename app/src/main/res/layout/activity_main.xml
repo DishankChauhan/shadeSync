@@ -198,6 +198,83 @@
         android:paddingTop="28dp"
         android:background="@drawable/bottom_bar_bg">
 
+        <!-- Look Presets toggle row -->
+        <LinearLayout
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:orientation="horizontal"
+            android:gravity="center_vertical"
+            android:paddingStart="16dp"
+            android:paddingEnd="16dp"
+            android:layout_marginBottom="8dp">
+
+            <TextView
+                android:id="@+id/btnShowPresets"
+                android:layout_width="wrap_content"
+                android:layout_height="32dp"
+                android:gravity="center"
+                android:paddingStart="14dp"
+                android:paddingEnd="14dp"
+                android:text="💅 Looks"
+                android:textColor="#FFFFFF"
+                android:textSize="12sp"
+                android:fontFamily="sans-serif-medium"
+                android:background="@drawable/analyze_btn_bg" />
+
+            <TextView
+                android:id="@+id/btnShowShades"
+                android:layout_width="wrap_content"
+                android:layout_height="32dp"
+                android:gravity="center"
+                android:paddingStart="14dp"
+                android:paddingEnd="14dp"
+                android:layout_marginStart="8dp"
+                android:text="💄 Shades"
+                android:textColor="#90FFFFFF"
+                android:textSize="12sp"
+                android:fontFamily="sans-serif-medium"
+                android:background="@drawable/toggle_bg" />
+
+            <TextView
+                android:id="@+id/activePresetLabel"
+                android:layout_width="0dp"
+                android:layout_height="wrap_content"
+                android:layout_weight="1"
+                android:gravity="end"
+                android:text=""
+                android:textColor="#B0FFFFFF"
+                android:textSize="11sp"
+                android:layout_marginEnd="4dp" />
+
+        </LinearLayout>
+
+        <!-- Preset picker (horizontal scroll, hidden by default) -->
+        <HorizontalScrollView
+            android:id="@+id/presetScrollView"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:scrollbars="none"
+            android:layout_marginBottom="8dp"
+            android:visibility="gone">
+
+            <LinearLayout
+                android:id="@+id/presetRow"
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:orientation="horizontal"
+                android:paddingStart="12dp"
+                android:paddingEnd="12dp" />
+
+        </HorizontalScrollView>
+
+        <!-- Shades panel (shown by default) -->
+        <LinearLayout
+            android:id="@+id/shadesPanel"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:orientation="vertical"
+            android:gravity="center_horizontal">
+
         <!-- Brightness slider -->
         <LinearLayout
             android:layout_width="match_parent"
@@ -412,6 +489,8 @@
             android:paddingBottom="48dp"
             android:paddingTop="4dp"
             android:clipToPadding="false" />
+
+        </LinearLayout>  <!-- end shadesPanel -->
 
     </LinearLayout>
 

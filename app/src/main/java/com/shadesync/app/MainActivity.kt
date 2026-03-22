@@ -96,6 +96,7 @@ class MainActivity : AppCompatActivity() {
         setupLightingControls()
         setupCaptureShare()
         setupSkinAnalysis()
+        setupLookPresets()
     }
 
     // ── Save & Share ──
@@ -191,6 +192,131 @@ class MainActivity : AppCompatActivity() {
             addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION)
         }
         startActivity(Intent.createChooser(intent, "Share your look"))
+    }
+
+    // ── Full Look Presets ──
+
+    private var activePresetView: View? = null
+
+    private fun setupLookPresets() {
+        buildPresetChips()
+
+        // Looks / Shades tab toggle
+        binding.btnShowPresets.setOnClickListener {
+            binding.presetScrollView.visibility = View.VISIBLE
+            binding.shadesPanel.visibility = View.GONE
+            binding.btnShowPresets.setBackgroundResource(R.drawable.analyze_btn_bg)
+            binding.btnShowPresets.setTextColor(Color.WHITE)
+            binding.btnShowShades.setBackgroundResource(R.drawable.toggle_bg)
+            binding.btnShowShades.setTextColor(0x90FFFFFF.toInt())
+        }
+        binding.btnShowShades.setOnClickListener {
+            binding.presetScrollView.visibility = View.GONE
+            binding.shadesPanel.visibility = View.VISIBLE
+            binding.btnShowShades.setBackgroundResource(R.drawable.analyze_btn_bg)
+            binding.btnShowShades.setTextColor(Color.WHITE)
+            binding.btnShowPresets.setBackgroundResource(R.drawable.toggle_bg)
+            binding.btnShowPresets.setTextColor(0x90FFFFFF.toInt())
+            // Reset blush + smoothing when switching back to manual shades
+            binding.faceMeshOverlay.setBlush(0, 0, 0, 0f)
+            binding.faceMeshOverlay.setSmoothing(0f)
+            binding.activePresetLabel.text = ""
+        }
+    }
+
+    private fun buildPresetChips() {
+        val container = binding.presetRow
+        container.removeAllViews()
+        val dp8 = TypedValue.applyDimension(TypedValue.COMPLEX_UNIT_DIP, 8f, resources.displayMetrics).toInt()
+        val dp12 = TypedValue.applyDimension(TypedValue.COMPLEX_UNIT_DIP, 12f, resources.displayMetrics).toInt()
+        val dp6 = TypedValue.applyDimension(TypedValue.COMPLEX_UNIT_DIP, 6f, resources.displayMetrics).toInt()
+
+        for (preset in PresetCatalog.presets) {
+            val chip = android.widget.LinearLayout(this).apply {
+                orientation = android.widget.LinearLayout.VERTICAL
+                gravity = android.view.Gravity.CENTER
+                setPadding(dp12, dp8, dp12, dp8)
+                setBackgroundResource(R.drawable.preset_chip_bg)
+                isClickable = true
+                isFocusable = true
+            }
+
+            val emojiTv = TextView(this).apply {
+                text = preset.emoji
+                textSize = 24f
+                gravity = android.view.Gravity.CENTER
+            }
+            chip.addView(emojiTv)
+
+            val nameTv = TextView(this).apply {
+                text = preset.name
+                textSize = 11f
+                setTextColor(Color.WHITE)
+                gravity = android.view.Gravity.CENTER
+                typeface = android.graphics.Typeface.create("sans-serif-medium", android.graphics.Typeface.NORMAL)
+            }
+            chip.addView(nameTv)
+
+            val descTv = TextView(this).apply {
+                text = preset.description
+                textSize = 8f
+                setTextColor(0x90FFFFFF.toInt())
+                gravity = android.view.Gravity.CENTER
+                maxLines = 2
+            }
+            chip.addView(descTv)
+
+            chip.setOnClickListener { applyPreset(preset, chip) }
+
+            val lp = android.widget.LinearLayout.LayoutParams(
+                android.widget.LinearLayout.LayoutParams.WRAP_CONTENT,
+                android.widget.LinearLayout.LayoutParams.WRAP_CONTENT
+            ).apply { marginEnd = dp6 }
+            container.addView(chip, lp)
+        }
+    }
+
+    private fun applyPreset(preset: LookPreset, chipView: View) {
+        // Highlight selected chip
+        activePresetView?.setBackgroundResource(R.drawable.preset_chip_bg)
+        chipView.setBackgroundResource(R.drawable.preset_chip_selected)
+        activePresetView = chipView
+
+        // Apply lipstick
+        val lip = preset.lipShade
+        binding.faceMeshOverlay.setLipColor(lip.r, lip.g, lip.b)
+        binding.shadeName.text = lip.name
+        binding.shadeBrand.text = "${preset.emoji} ${preset.name}"
+
+        // Apply blush
+        binding.faceMeshOverlay.setBlush(preset.blushR, preset.blushG, preset.blushB, preset.blushIntensity)
+
+        // Apply smoothing
+        binding.faceMeshOverlay.setSmoothing(preset.smoothing)
+
+        // Apply finish
+        binding.faceMeshOverlay.isGlossy = preset.glossy
+        if (preset.glossy) {
+            binding.btnGlossy.setBackgroundResource(R.drawable.toggle_selected_bg)
+            binding.btnGlossy.setTextColor(Color.WHITE)
+            binding.btnMatte.background = null
+            binding.btnMatte.setTextColor(0x80FFFFFF.toInt())
+        } else {
+            binding.btnMatte.setBackgroundResource(R.drawable.toggle_selected_bg)
+            binding.btnMatte.setTextColor(Color.WHITE)
+            binding.btnGlossy.background = null
+            binding.btnGlossy.setTextColor(0x80FFFFFF.toInt())
+        }
+
+        // Apply brightness + tone
+        binding.faceMeshOverlay.brightness = preset.brightness
+        binding.brightnessSlider.progress = ((preset.brightness - 0.3f) * 100f).toInt().coerceIn(0, 150)
+        binding.faceMeshOverlay.toneShift = preset.toneShift
+
+        // Update active label
+        binding.activePresetLabel.text = "${preset.emoji} ${preset.name}"
+
+        Toast.makeText(this, "${preset.emoji} ${preset.name} applied!", Toast.LENGTH_SHORT).show()
     }
 
     // ── Dynamic shade picker ──
