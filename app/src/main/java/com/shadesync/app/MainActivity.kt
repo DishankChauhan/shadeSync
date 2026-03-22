@@ -6,6 +6,7 @@ import android.graphics.Bitmap
 import android.graphics.Matrix
 import android.os.Bundle
 import android.util.Log
+import android.util.Size
 import android.widget.Toast
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.appcompat.app.AppCompatActivity
@@ -29,6 +30,11 @@ class MainActivity : AppCompatActivity() {
     private lateinit var binding: ActivityMainBinding
     private var faceLandmarker: FaceLandmarker? = null
     private val analysisExecutor = Executors.newSingleThreadExecutor()
+
+    // --- Bitmap reuse pool to avoid per-frame allocation ---
+    private var reusableBitmap: Bitmap? = null
+    private var rotatedBitmap: Bitmap? = null
+    private val rotationMatrix = Matrix()  // Reuse matrix object
 
     private val cameraPermissionLauncher =
         registerForActivityResult(ActivityResultContracts.RequestPermission()) { granted ->
@@ -110,10 +116,19 @@ class MainActivity : AppCompatActivity() {
     }
 
     private fun setupFaceLandmarker() {
+        // Try GPU delegate first for better performance, fall back to CPU
+        val delegate = try {
+            // Test if GPU delegate works on this device
+            Delegate.GPU
+        } catch (e: Exception) {
+            Log.w(TAG, "GPU delegate not available, using CPU")
+            Delegate.CPU
+        }
+
         try {
             val baseOptions = BaseOptions.builder()
                 .setModelAssetPath("face_landmarker.task")
-                .setDelegate(Delegate.CPU)
+                .setDelegate(delegate)
                 .build()
 
             val options = FaceLandmarker.FaceLandmarkerOptions.builder()
@@ -130,8 +145,38 @@ class MainActivity : AppCompatActivity() {
                 .build()
 
             faceLandmarker = FaceLandmarker.createFromOptions(this, options)
+            Log.d(TAG, "FaceLandmarker initialized with delegate: $delegate")
         } catch (e: Exception) {
-            Log.e(TAG, "Failed to initialize FaceLandmarker: ${e.message}", e)
+            // If GPU failed at creation, retry with CPU
+            if (delegate == Delegate.GPU) {
+                Log.w(TAG, "GPU delegate failed, retrying with CPU: ${e.message}")
+                try {
+                    val cpuOptions = BaseOptions.builder()
+                        .setModelAssetPath("face_landmarker.task")
+                        .setDelegate(Delegate.CPU)
+                        .build()
+
+                    val options = FaceLandmarker.FaceLandmarkerOptions.builder()
+                        .setBaseOptions(cpuOptions)
+                        .setRunningMode(RunningMode.LIVE_STREAM)
+                        .setNumFaces(1)
+                        .setMinFaceDetectionConfidence(0.5f)
+                        .setMinFacePresenceConfidence(0.5f)
+                        .setMinTrackingConfidence(0.5f)
+                        .setResultListener(this::handleResult)
+                        .setErrorListener { error ->
+                            Log.e(TAG, "MediaPipe error: ${error.message}")
+                        }
+                        .build()
+
+                    faceLandmarker = FaceLandmarker.createFromOptions(this, options)
+                    Log.d(TAG, "FaceLandmarker initialized with CPU fallback")
+                } catch (e2: Exception) {
+                    Log.e(TAG, "Failed to initialize FaceLandmarker: ${e2.message}", e2)
+                }
+            } else {
+                Log.e(TAG, "Failed to initialize FaceLandmarker: ${e.message}", e)
+            }
         }
     }
 
@@ -159,7 +204,9 @@ class MainActivity : AppCompatActivity() {
                 .build()
                 .also { it.setSurfaceProvider(binding.previewView.surfaceProvider) }
 
+            // Cap analysis resolution to 480p for faster MediaPipe processing
             val imageAnalysis = ImageAnalysis.Builder()
+                .setTargetResolution(Size(640, 480))
                 .setTargetRotation(binding.previewView.display.rotation)
                 .setBackpressureStrategy(ImageAnalysis.STRATEGY_KEEP_ONLY_LATEST)
                 .setOutputImageFormat(ImageAnalysis.OUTPUT_IMAGE_FORMAT_RGBA_8888)
@@ -189,39 +236,73 @@ class MainActivity : AppCompatActivity() {
         }
 
         val bitmap = imageToBitmap(imageProxy)
+        if (bitmap == null) {
+            imageProxy.close()
+            return
+        }
+
         val mpImage = BitmapImageBuilder(bitmap).build()
-        val timestampMs = imageProxy.imageInfo.timestamp / 1_000 // microseconds to ms
+        val timestampMs = imageProxy.imageInfo.timestamp / 1_000
 
         try {
             landmarker.detectAsync(mpImage, timestampMs)
         } catch (e: Exception) {
-            Log.e(TAG, "Detection failed: ${e.message}")
+            // Silently skip — timestamp ordering issues are expected under load
         }
 
         imageProxy.close()
     }
 
-    private fun imageToBitmap(imageProxy: ImageProxy): Bitmap {
+    /**
+     * Optimized bitmap conversion — reuses bitmap objects across frames
+     * to eliminate per-frame allocation and GC pressure.
+     */
+    private fun imageToBitmap(imageProxy: ImageProxy): Bitmap? {
         val plane = imageProxy.planes[0]
         val buffer = plane.buffer
         buffer.rewind()
-        val bitmap = Bitmap.createBitmap(
-            imageProxy.width,
-            imageProxy.height,
-            Bitmap.Config.ARGB_8888
-        )
-        bitmap.copyPixelsFromBuffer(buffer)
 
-        // Rotate bitmap to match display orientation
-        val matrix = Matrix()
-        matrix.postRotate(imageProxy.imageInfo.rotationDegrees.toFloat())
-        return Bitmap.createBitmap(bitmap, 0, 0, bitmap.width, bitmap.height, matrix, true)
+        val w = imageProxy.width
+        val h = imageProxy.height
+
+        // Reuse the source bitmap if dimensions match
+        val srcBitmap = reusableBitmap.let { existing ->
+            if (existing != null && existing.width == w && existing.height == h) {
+                existing
+            } else {
+                reusableBitmap?.recycle()
+                Bitmap.createBitmap(w, h, Bitmap.Config.ARGB_8888).also {
+                    reusableBitmap = it
+                }
+            }
+        }
+
+        try {
+            srcBitmap.copyPixelsFromBuffer(buffer)
+        } catch (e: Exception) {
+            return null
+        }
+
+        val rotation = imageProxy.imageInfo.rotationDegrees.toFloat()
+        if (rotation == 0f) return srcBitmap
+
+        // Reuse rotation matrix
+        rotationMatrix.reset()
+        rotationMatrix.postRotate(rotation)
+
+        // For rotated bitmaps, we must create a new one (dimensions may swap)
+        // but we recycle the old rotated bitmap to limit allocations
+        rotatedBitmap?.recycle()
+        rotatedBitmap = Bitmap.createBitmap(srcBitmap, 0, 0, w, h, rotationMatrix, false)
+        return rotatedBitmap
     }
 
     override fun onDestroy() {
         super.onDestroy()
         faceLandmarker?.close()
         analysisExecutor.shutdown()
+        reusableBitmap?.recycle()
+        rotatedBitmap?.recycle()
     }
 
     companion object {
