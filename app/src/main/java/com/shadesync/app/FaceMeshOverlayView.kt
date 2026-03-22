@@ -48,6 +48,14 @@ class FaceMeshOverlayView @JvmOverloads constructor(
     var isGlossy: Boolean = true
         set(value) { field = value; invalidate() }
 
+    /** Brightness multiplier: 0.0 = black, 1.0 = original, 2.0 = double bright. */
+    var brightness: Float = 1.0f
+        set(value) { field = value.coerceIn(0.3f, 1.8f); applyColourToPaints(); invalidate() }
+
+    /** Tone shift: -1.0 = full cool (blue bias), 0 = neutral, +1.0 = full warm (orange bias). */
+    var toneShift: Float = 0f
+        set(value) { field = value.coerceIn(-1f, 1f); applyColourToPaints(); invalidate() }
+
     // ──────────── Paint objects ────────────
     // Layer 1 — sheer base (skin texture visible through low alpha)
     private val lipBasePaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
@@ -137,9 +145,32 @@ class FaceMeshOverlayView @JvmOverloads constructor(
 
     // ──────────── Internal helpers ────────────
 
-    /** Push current lipR/G/B into every paint that depends on colour. */
+    /**
+     * Apply brightness + tone shift to the base lipR/G/B, then push
+     * the adjusted colour into every paint.
+     */
     private fun applyColourToPaints() {
-        val r = lipR; val g = lipG; val b = lipB
+        // 1. Brightness
+        var r = (lipR * brightness).toInt()
+        var g = (lipG * brightness).toInt()
+        var b = (lipB * brightness).toInt()
+
+        // 2. Tone shift — warm pushes toward orange, cool toward blue
+        if (toneShift > 0f) {            // warm
+            r = (r + 30 * toneShift).toInt()
+            g = (g + 8 * toneShift).toInt()
+            b = (b - 20 * toneShift).toInt()
+        } else if (toneShift < 0f) {     // cool
+            val t = -toneShift
+            r = (r - 20 * t).toInt()
+            g = (g + 4 * t).toInt()
+            b = (b + 25 * t).toInt()
+        }
+
+        r = r.coerceIn(0, 255)
+        g = g.coerceIn(0, 255)
+        b = b.coerceIn(0, 255)
+
         lipBasePaint.color  = Color.argb(38, r, g, b)
         lipCorePaint.color  = Color.argb(58, r, g, b)
         lipDepthPaint.color = Color.argb(30,

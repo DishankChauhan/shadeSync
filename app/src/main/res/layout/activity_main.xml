@@ -24,6 +24,52 @@
         android:paddingTop="28dp"
         android:background="@drawable/bottom_bar_bg">
 
+        <!-- Brightness slider -->
+        <LinearLayout
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:orientation="horizontal"
+            android:gravity="center_vertical"
+            android:paddingStart="24dp"
+            android:paddingEnd="24dp"
+            android:layout_marginBottom="10dp">
+
+            <TextView
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:text="☀"
+                android:textSize="14sp"
+                android:textColor="#90FFFFFF" />
+
+            <SeekBar
+                android:id="@+id/brightnessSlider"
+                android:layout_width="0dp"
+                android:layout_height="28dp"
+                android:layout_weight="1"
+                android:layout_marginStart="8dp"
+                android:layout_marginEnd="8dp"
+                android:max="150"
+                android:progress="70"
+                android:progressTint="#FFFFFFFF"
+                android:thumbTint="#FFFFFFFF" />
+
+            <TextView
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:text="☀"
+                android:textSize="20sp"
+                android:textColor="#FFFFFFFF" />
+
+        </LinearLayout>
+
+        <!-- Finish + Tone toggle row -->
+        <LinearLayout
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:orientation="horizontal"
+            android:gravity="center"
+            android:layout_marginBottom="18dp">
+
         <!-- Finish toggle (Matte / Glossy) -->
         <LinearLayout
             android:id="@+id/finishToggle"
@@ -31,7 +77,6 @@
             android:layout_height="34dp"
             android:orientation="horizontal"
             android:background="@drawable/toggle_bg"
-            android:layout_marginBottom="18dp"
             android:padding="2dp">
 
             <TextView
@@ -60,6 +105,61 @@
                 android:fontFamily="sans-serif-medium"
                 android:letterSpacing="0.08"
                 android:background="@drawable/toggle_selected_bg" />
+
+        </LinearLayout>
+
+        <View
+            android:layout_width="12dp"
+            android:layout_height="1dp" />
+
+        <!-- Tone toggle (Cool / Warm) -->
+        <LinearLayout
+            android:id="@+id/toneToggle"
+            android:layout_width="wrap_content"
+            android:layout_height="34dp"
+            android:orientation="horizontal"
+            android:background="@drawable/toggle_bg"
+            android:padding="2dp">
+
+            <TextView
+                android:id="@+id/btnCool"
+                android:layout_width="wrap_content"
+                android:layout_height="match_parent"
+                android:paddingStart="18dp"
+                android:paddingEnd="18dp"
+                android:gravity="center"
+                android:text="COOL"
+                android:textColor="#80FFFFFF"
+                android:textSize="11sp"
+                android:fontFamily="sans-serif-medium"
+                android:letterSpacing="0.08" />
+
+            <TextView
+                android:id="@+id/btnNeutral"
+                android:layout_width="wrap_content"
+                android:layout_height="match_parent"
+                android:paddingStart="14dp"
+                android:paddingEnd="14dp"
+                android:gravity="center"
+                android:text="●"
+                android:textColor="#FFFFFF"
+                android:textSize="11sp"
+                android:background="@drawable/toggle_selected_bg" />
+
+            <TextView
+                android:id="@+id/btnWarm"
+                android:layout_width="wrap_content"
+                android:layout_height="match_parent"
+                android:paddingStart="18dp"
+                android:paddingEnd="18dp"
+                android:gravity="center"
+                android:text="WARM"
+                android:textColor="#80FFFFFF"
+                android:textSize="11sp"
+                android:fontFamily="sans-serif-medium"
+                android:letterSpacing="0.08" />
+
+        </LinearLayout>
 
         </LinearLayout>
 

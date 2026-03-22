@@ -7,6 +7,7 @@ import android.graphics.Color
 import android.graphics.Matrix
 import android.os.Bundle
 import android.util.Log
+import android.widget.SeekBar
 import android.widget.Toast
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.appcompat.app.AppCompatActivity
@@ -68,6 +69,7 @@ class MainActivity : AppCompatActivity() {
 
         setupColorButtons()
         setupFinishToggle()
+        setupLightingControls()
     }
 
     private fun setupColorButtons() {
@@ -116,6 +118,40 @@ class MainActivity : AppCompatActivity() {
             binding.btnGlossy.background = null
             binding.btnGlossy.setTextColor(0x80FFFFFF.toInt())
         }
+    }
+
+    // ── Lighting controls ──
+
+    private fun setupLightingControls() {
+        // Brightness slider: SeekBar 0–150 maps to 0.3–1.8
+        binding.brightnessSlider.setOnSeekBarChangeListener(object : SeekBar.OnSeekBarChangeListener {
+            override fun onProgressChanged(sb: SeekBar?, progress: Int, fromUser: Boolean) {
+                binding.faceMeshOverlay.brightness = 0.3f + progress / 100f
+            }
+            override fun onStartTrackingTouch(sb: SeekBar?) {}
+            override fun onStopTrackingTouch(sb: SeekBar?) {}
+        })
+
+        // Tone toggle: Cool / Neutral / Warm
+        val toneButtons = arrayOf(binding.btnCool, binding.btnNeutral, binding.btnWarm)
+        val toneValues = floatArrayOf(-0.7f, 0f, 0.7f)
+
+        fun selectTone(idx: Int) {
+            binding.faceMeshOverlay.toneShift = toneValues[idx]
+            for (i in toneButtons.indices) {
+                if (i == idx) {
+                    toneButtons[i].setBackgroundResource(R.drawable.toggle_selected_bg)
+                    toneButtons[i].setTextColor(Color.WHITE)
+                } else {
+                    toneButtons[i].background = null
+                    toneButtons[i].setTextColor(0x80FFFFFF.toInt())
+                }
+            }
+        }
+
+        binding.btnCool.setOnClickListener { selectTone(0) }
+        binding.btnNeutral.setOnClickListener { selectTone(1) }
+        binding.btnWarm.setOnClickListener { selectTone(2) }
     }
 
     private var selectedView: android.view.View? = null
