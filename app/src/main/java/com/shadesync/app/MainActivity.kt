@@ -67,8 +67,13 @@ class MainActivity : AppCompatActivity() {
     private val cameraPermissionLauncher =
         registerForActivityResult(ActivityResultContracts.RequestPermission()) { granted ->
             if (granted) {
-                setupFaceLandmarker()
-                startCamera()
+                try {
+                    setupFaceLandmarker()
+                    startCamera()
+                } catch (e: Exception) {
+                    Log.e(TAG, "Failed to start camera after permission grant", e)
+                    Toast.makeText(this, "Camera initialization failed", Toast.LENGTH_LONG).show()
+                }
             } else {
                 Toast.makeText(
                     this,
@@ -616,14 +621,8 @@ class MainActivity : AppCompatActivity() {
     }
 
     private fun setupFaceLandmarker() {
-        // Try GPU delegate first for better performance, fall back to CPU
-        val delegate = try {
-            // Test if GPU delegate works on this device
-            Delegate.GPU
-        } catch (e: Exception) {
-            Log.w(TAG, "GPU delegate not available, using CPU")
-            Delegate.CPU
-        }
+        // Always use CPU delegate — GPU delegate causes native crashes on many devices
+        val delegate = Delegate.CPU
 
         try {
             val baseOptions = BaseOptions.builder()
@@ -645,37 +644,11 @@ class MainActivity : AppCompatActivity() {
                 .build()
 
             faceLandmarker = FaceLandmarker.createFromOptions(this, options)
-            Log.d(TAG, "FaceLandmarker initialized with delegate: $delegate")
+            Log.d(TAG, "FaceLandmarker initialized with CPU delegate")
         } catch (e: Exception) {
-            // If GPU failed at creation, retry with CPU
-            if (delegate == Delegate.GPU) {
-                Log.w(TAG, "GPU delegate failed, retrying with CPU: ${e.message}")
-                try {
-                    val cpuOptions = BaseOptions.builder()
-                        .setModelAssetPath("face_landmarker.task")
-                        .setDelegate(Delegate.CPU)
-                        .build()
-
-                    val options = FaceLandmarker.FaceLandmarkerOptions.builder()
-                        .setBaseOptions(cpuOptions)
-                        .setRunningMode(RunningMode.LIVE_STREAM)
-                        .setNumFaces(1)
-                        .setMinFaceDetectionConfidence(0.5f)
-                        .setMinFacePresenceConfidence(0.5f)
-                        .setMinTrackingConfidence(0.5f)
-                        .setResultListener(this::handleResult)
-                        .setErrorListener { error ->
-                            Log.e(TAG, "MediaPipe error: ${error.message}")
-                        }
-                        .build()
-
-                    faceLandmarker = FaceLandmarker.createFromOptions(this, options)
-                    Log.d(TAG, "FaceLandmarker initialized with CPU fallback")
-                } catch (e2: Exception) {
-                    Log.e(TAG, "Failed to initialize FaceLandmarker: ${e2.message}", e2)
-                }
-            } else {
-                Log.e(TAG, "Failed to initialize FaceLandmarker: ${e.message}", e)
+            Log.e(TAG, "Failed to initialize FaceLandmarker: ${e.message}", e)
+            runOnUiThread {
+                Toast.makeText(this, "Face detection init failed — try restarting", Toast.LENGTH_LONG).show()
             }
         }
     }
