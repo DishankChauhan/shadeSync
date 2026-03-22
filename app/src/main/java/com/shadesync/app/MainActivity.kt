@@ -73,30 +73,30 @@ class MainActivity : AppCompatActivity() {
     }
 
     private fun setupColorButtons() {
-        // Classic Red
+        // Cherry Crush
         binding.btnColorRed.setOnClickListener {
             binding.faceMeshOverlay.setLipColor(200, 30, 60)
-            highlightSelected(it)
+            highlightSelected(it, "Cherry Crush")
         }
-        // Rose Pink
+        // Rose Petal
         binding.btnColorPink.setOnClickListener {
             binding.faceMeshOverlay.setLipColor(220, 80, 120)
-            highlightSelected(it)
+            highlightSelected(it, "Rose Petal")
         }
-        // Berry / Plum
+        // Berry Noir
         binding.btnColorBerry.setOnClickListener {
             binding.faceMeshOverlay.setLipColor(140, 30, 100)
-            highlightSelected(it)
+            highlightSelected(it, "Berry Noir")
         }
-        // Nude / MLBB
+        // Nude Silk
         binding.btnColorNude.setOnClickListener {
             binding.faceMeshOverlay.setLipColor(180, 110, 90)
-            highlightSelected(it)
+            highlightSelected(it, "Nude Silk")
         }
-        // Coral Orange
+        // Sunset Coral
         binding.btnColorOrange.setOnClickListener {
             binding.faceMeshOverlay.setLipColor(220, 100, 50)
-            highlightSelected(it)
+            highlightSelected(it, "Sunset Coral")
         }
 
         // Default selection
@@ -156,7 +156,7 @@ class MainActivity : AppCompatActivity() {
 
     private var selectedView: android.view.View? = null
 
-    private fun highlightSelected(view: android.view.View) {
+    private fun highlightSelected(view: android.view.View, shadeName: String = "") {
         // Reset previous
         selectedView?.apply {
             scaleX = 1.0f
@@ -168,6 +168,10 @@ class MainActivity : AppCompatActivity() {
         view.scaleY = 1.3f
         view.alpha = 1.0f
         selectedView = view
+        // Update shade name label
+        if (shadeName.isNotEmpty()) {
+            binding.shadeName.text = shadeName
+        }
     }
 
     private fun setupFaceLandmarker() {

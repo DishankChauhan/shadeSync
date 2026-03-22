@@ -163,6 +163,18 @@
 
         </LinearLayout>
 
+        <!-- Shade name label -->
+        <TextView
+            android:id="@+id/shadeName"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:text="Cherry Crush"
+            android:textColor="#FFFFFF"
+            android:textSize="15sp"
+            android:fontFamily="sans-serif-medium"
+            android:letterSpacing="0.06"
+            android:layout_marginBottom="12dp" />
+
         <!-- Colour swatches -->
         <LinearLayout
             android:id="@+id/colorPickerBar"
