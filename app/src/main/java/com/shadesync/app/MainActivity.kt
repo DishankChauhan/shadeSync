@@ -54,6 +54,8 @@ class MainActivity : AppCompatActivity() {
     private val analysisExecutor = Executors.newSingleThreadExecutor()
     private lateinit var shadeAdapter: ShadeAdapter
     private var activeBrand: String? = null   // null = "All"
+    private var latestResult: FaceLandmarkerResult? = null
+    private var recAdapter: ShadeAdapter? = null
 
     // --- Bitmap reuse pool to avoid per-frame allocation ---
     private var reusableBitmap: Bitmap? = null
@@ -93,6 +95,7 @@ class MainActivity : AppCompatActivity() {
         setupFinishToggle()
         setupLightingControls()
         setupCaptureShare()
+        setupSkinAnalysis()
     }
 
     // ── Save & Share ──
@@ -348,6 +351,81 @@ class MainActivity : AppCompatActivity() {
         binding.btnWarm.setOnClickListener { selectTone(2) }
     }
 
+    // ── Skin Analysis + Recommendation ──
+
+    private fun setupSkinAnalysis() {
+        binding.btnAnalyze.setOnClickListener { runSkinAnalysis() }
+        binding.btnCloseRec.setOnClickListener {
+            binding.recommendationCard.visibility = View.GONE
+        }
+        binding.btnApplyTopPick.setOnClickListener {
+            // Apply whatever shade the recAdapter has selected (first item)
+            recAdapter?.let { /* already applied via onShadeSelected callback */ }
+            binding.recommendationCard.visibility = View.GONE
+        }
+    }
+
+    private fun runSkinAnalysis() {
+        val result = latestResult
+        if (result == null || result.faceLandmarks().isEmpty()) {
+            Toast.makeText(this, "No face detected — look at the camera", Toast.LENGTH_SHORT).show()
+            return
+        }
+
+        val bitmap = binding.previewView.bitmap
+        if (bitmap == null) {
+            Toast.makeText(this, "Camera not ready", Toast.LENGTH_SHORT).show()
+            return
+        }
+
+        val landmarks = result.faceLandmarks()[0]
+        val analysis = SkinAnalyzer.analyse(bitmap, landmarks, isMirrored = true)
+
+        if (analysis == null) {
+            Toast.makeText(this, "Could not analyse skin — try better lighting", Toast.LENGTH_SHORT).show()
+            return
+        }
+
+        // Show the card
+        binding.recommendationCard.visibility = View.VISIBLE
+
+        // Populate analysis results
+        binding.skinAnalysisResult.text = analysis.label
+
+        // Skin colour swatch
+        val skinColor = Color.rgb(analysis.avgR, analysis.avgG, analysis.avgB)
+        val swatchBg = GradientDrawable().apply {
+            shape = GradientDrawable.OVAL
+            setColor(skinColor)
+            setStroke(2, Color.WHITE)
+        }
+        binding.skinSwatch.background = swatchBg
+
+        // Hex + confidence
+        binding.skinHexLabel.text = String.format("#%02X%02X%02X", analysis.avgR, analysis.avgG, analysis.avgB)
+        binding.confidenceLabel.text = "Confidence: ${(analysis.confidence * 100).toInt()}%"
+
+        // Get recommendations
+        val recs = ShadeRecommender.recommend(analysis)
+
+        // Set up recAdapter
+        val recShades = recs.map { it.shade }
+        recAdapter = ShadeAdapter(recShades) { shade ->
+            applyShade(shade)
+        }
+        binding.recRecycler.layoutManager =
+            LinearLayoutManager(this, LinearLayoutManager.HORIZONTAL, false)
+        binding.recRecycler.adapter = recAdapter
+
+        // Auto-apply top pick
+        if (recs.isNotEmpty()) {
+            val top = recs[0]
+            applyShade(top.shade)
+            recAdapter?.selectFirst()
+            Toast.makeText(this, "✨ ${top.shade.name} — ${top.reason}", Toast.LENGTH_LONG).show()
+        }
+    }
+
     private fun setupFaceLandmarker() {
         // Try GPU delegate first for better performance, fall back to CPU
         val delegate = try {
@@ -416,6 +494,7 @@ class MainActivity : AppCompatActivity() {
     private fun handleResult(result: FaceLandmarkerResult, input: com.google.mediapipe.framework.image.MPImage) {
         runOnUiThread {
             if (result.faceLandmarks().isNotEmpty()) {
+                latestResult = result
                 binding.faceMeshOverlay.setResults(
                     result,
                     input.width,

@@ -14,6 +14,146 @@
         android:layout_width="match_parent"
         android:layout_height="match_parent" />
 
+    <!-- Top-left: Analyze Me button -->
+    <TextView
+        android:id="@+id/btnAnalyze"
+        android:layout_width="wrap_content"
+        android:layout_height="40dp"
+        android:layout_gravity="top|start"
+        android:layout_marginTop="48dp"
+        android:layout_marginStart="16dp"
+        android:background="@drawable/analyze_btn_bg"
+        android:gravity="center"
+        android:paddingStart="18dp"
+        android:paddingEnd="18dp"
+        android:text="✨ Analyze Me"
+        android:textColor="#FFFFFF"
+        android:textSize="13sp"
+        android:fontFamily="sans-serif-medium"
+        android:letterSpacing="0.04" />
+
+    <!-- Recommendation overlay card (hidden by default) -->
+    <LinearLayout
+        android:id="@+id/recommendationCard"
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:layout_gravity="top|center_horizontal"
+        android:layout_marginTop="100dp"
+        android:layout_marginStart="20dp"
+        android:layout_marginEnd="20dp"
+        android:orientation="vertical"
+        android:background="@drawable/recommendation_card_bg"
+        android:padding="18dp"
+        android:visibility="gone"
+        android:elevation="8dp">
+
+        <!-- Close button row -->
+        <LinearLayout
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:orientation="horizontal"
+            android:gravity="center_vertical">
+
+            <TextView
+                android:layout_width="0dp"
+                android:layout_height="wrap_content"
+                android:layout_weight="1"
+                android:text="Your Skin Analysis"
+                android:textColor="#FFFFFF"
+                android:textSize="16sp"
+                android:fontFamily="sans-serif-medium" />
+
+            <TextView
+                android:id="@+id/btnCloseRec"
+                android:layout_width="28dp"
+                android:layout_height="28dp"
+                android:gravity="center"
+                android:text="✕"
+                android:textColor="#90FFFFFF"
+                android:textSize="16sp"
+                android:background="@drawable/toggle_bg" />
+
+        </LinearLayout>
+
+        <!-- Skin tone + undertone result -->
+        <TextView
+            android:id="@+id/skinAnalysisResult"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:text="Analyzing..."
+            android:textColor="#E0FFFFFF"
+            android:textSize="14sp"
+            android:layout_marginTop="12dp" />
+
+        <!-- Skin colour swatch -->
+        <LinearLayout
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:orientation="horizontal"
+            android:gravity="center_vertical"
+            android:layout_marginTop="8dp">
+
+            <View
+                android:id="@+id/skinSwatch"
+                android:layout_width="32dp"
+                android:layout_height="32dp"
+                android:background="@drawable/toggle_bg" />
+
+            <TextView
+                android:id="@+id/skinHexLabel"
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:text="#000000"
+                android:textColor="#90FFFFFF"
+                android:textSize="12sp"
+                android:layout_marginStart="10dp"
+                android:fontFamily="monospace" />
+
+            <TextView
+                android:id="@+id/confidenceLabel"
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:text="Confidence: 85%"
+                android:textColor="#90FFFFFF"
+                android:textSize="11sp"
+                android:layout_marginStart="16dp" />
+
+        </LinearLayout>
+
+        <!-- "Best for you" label -->
+        <TextView
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:text="✨ Recommended shades for you"
+            android:textColor="#FFFFFF"
+            android:textSize="13sp"
+            android:fontFamily="sans-serif-medium"
+            android:layout_marginTop="14dp"
+            android:layout_marginBottom="6dp" />
+
+        <!-- Recommendation RecyclerView -->
+        <androidx.recyclerview.widget.RecyclerView
+            android:id="@+id/recRecycler"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:paddingTop="4dp"
+            android:clipToPadding="false" />
+
+        <!-- "Apply Top Pick" button -->
+        <TextView
+            android:id="@+id/btnApplyTopPick"
+            android:layout_width="match_parent"
+            android:layout_height="40dp"
+            android:layout_marginTop="12dp"
+            android:background="@drawable/analyze_btn_bg"
+            android:gravity="center"
+            android:text="💄 Apply Top Pick"
+            android:textColor="#FFFFFF"
+            android:textSize="13sp"
+            android:fontFamily="sans-serif-medium" />
+
+    </LinearLayout>
+
     <!-- Top-right action buttons -->
     <LinearLayout
         android:layout_width="wrap_content"
