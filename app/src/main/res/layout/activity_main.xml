@@ -14,57 +14,106 @@
         android:layout_width="match_parent"
         android:layout_height="match_parent" />
 
-    <!-- Lipstick color picker — frosted bottom bar -->
+    <!-- Bottom controls container -->
     <LinearLayout
-        android:id="@+id/colorPickerBar"
         android:layout_width="match_parent"
         android:layout_height="wrap_content"
         android:layout_gravity="bottom"
-        android:gravity="center"
-        android:orientation="horizontal"
-        android:paddingBottom="48dp"
-        android:paddingTop="20dp"
+        android:orientation="vertical"
+        android:gravity="center_horizontal"
+        android:paddingTop="28dp"
         android:background="@drawable/bottom_bar_bg">
 
-        <View
-            android:id="@+id/btnColorRed"
-            android:layout_width="48dp"
-            android:layout_height="48dp"
-            android:layout_marginStart="10dp"
-            android:layout_marginEnd="10dp"
-            android:background="@drawable/color_circle_red" />
+        <!-- Finish toggle (Matte / Glossy) -->
+        <LinearLayout
+            android:id="@+id/finishToggle"
+            android:layout_width="wrap_content"
+            android:layout_height="34dp"
+            android:orientation="horizontal"
+            android:background="@drawable/toggle_bg"
+            android:layout_marginBottom="18dp"
+            android:padding="2dp">
 
-        <View
-            android:id="@+id/btnColorPink"
-            android:layout_width="48dp"
-            android:layout_height="48dp"
-            android:layout_marginStart="10dp"
-            android:layout_marginEnd="10dp"
-            android:background="@drawable/color_circle_pink" />
+            <TextView
+                android:id="@+id/btnMatte"
+                android:layout_width="wrap_content"
+                android:layout_height="match_parent"
+                android:paddingStart="22dp"
+                android:paddingEnd="22dp"
+                android:gravity="center"
+                android:text="MATTE"
+                android:textColor="#80FFFFFF"
+                android:textSize="11sp"
+                android:fontFamily="sans-serif-medium"
+                android:letterSpacing="0.08" />
 
-        <View
-            android:id="@+id/btnColorBerry"
-            android:layout_width="48dp"
-            android:layout_height="48dp"
-            android:layout_marginStart="10dp"
-            android:layout_marginEnd="10dp"
-            android:background="@drawable/color_circle_berry" />
+            <TextView
+                android:id="@+id/btnGlossy"
+                android:layout_width="wrap_content"
+                android:layout_height="match_parent"
+                android:paddingStart="22dp"
+                android:paddingEnd="22dp"
+                android:gravity="center"
+                android:text="GLOSSY"
+                android:textColor="#FFFFFF"
+                android:textSize="11sp"
+                android:fontFamily="sans-serif-medium"
+                android:letterSpacing="0.08"
+                android:background="@drawable/toggle_selected_bg" />
 
-        <View
-            android:id="@+id/btnColorNude"
-            android:layout_width="48dp"
-            android:layout_height="48dp"
-            android:layout_marginStart="10dp"
-            android:layout_marginEnd="10dp"
-            android:background="@drawable/color_circle_nude" />
+        </LinearLayout>
 
-        <View
-            android:id="@+id/btnColorOrange"
-            android:layout_width="48dp"
-            android:layout_height="48dp"
-            android:layout_marginStart="10dp"
-            android:layout_marginEnd="10dp"
-            android:background="@drawable/color_circle_orange" />
+        <!-- Colour swatches -->
+        <LinearLayout
+            android:id="@+id/colorPickerBar"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:gravity="center"
+            android:orientation="horizontal"
+            android:paddingBottom="48dp"
+            android:paddingTop="4dp">
+
+            <View
+                android:id="@+id/btnColorRed"
+                android:layout_width="48dp"
+                android:layout_height="48dp"
+                android:layout_marginStart="10dp"
+                android:layout_marginEnd="10dp"
+                android:background="@drawable/color_circle_red" />
+
+            <View
+                android:id="@+id/btnColorPink"
+                android:layout_width="48dp"
+                android:layout_height="48dp"
+                android:layout_marginStart="10dp"
+                android:layout_marginEnd="10dp"
+                android:background="@drawable/color_circle_pink" />
+
+            <View
+                android:id="@+id/btnColorBerry"
+                android:layout_width="48dp"
+                android:layout_height="48dp"
+                android:layout_marginStart="10dp"
+                android:layout_marginEnd="10dp"
+                android:background="@drawable/color_circle_berry" />
+
+            <View
+                android:id="@+id/btnColorNude"
+                android:layout_width="48dp"
+                android:layout_height="48dp"
+                android:layout_marginStart="10dp"
+                android:layout_marginEnd="10dp"
+                android:background="@drawable/color_circle_nude" />
+
+            <View
+                android:id="@+id/btnColorOrange"
+                android:layout_width="48dp"
+                android:layout_height="48dp"
+                android:layout_marginStart="10dp"
+                android:layout_marginEnd="10dp"
+                android:background="@drawable/color_circle_orange" />
+
+        </LinearLayout>
 
     </LinearLayout>
 

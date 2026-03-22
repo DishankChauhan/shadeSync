@@ -3,6 +3,7 @@ package com.shadesync.app
 import android.Manifest
 import android.content.pm.PackageManager
 import android.graphics.Bitmap
+import android.graphics.Color
 import android.graphics.Matrix
 import android.os.Bundle
 import android.util.Log
@@ -66,6 +67,7 @@ class MainActivity : AppCompatActivity() {
         }
 
         setupColorButtons()
+        setupFinishToggle()
     }
 
     private fun setupColorButtons() {
@@ -97,6 +99,23 @@ class MainActivity : AppCompatActivity() {
 
         // Default selection
         highlightSelected(binding.btnColorRed)
+    }
+
+    private fun setupFinishToggle() {
+        binding.btnGlossy.setOnClickListener {
+            binding.faceMeshOverlay.isGlossy = true
+            binding.btnGlossy.setBackgroundResource(R.drawable.toggle_selected_bg)
+            binding.btnGlossy.setTextColor(Color.WHITE)
+            binding.btnMatte.background = null
+            binding.btnMatte.setTextColor(0x80FFFFFF.toInt())
+        }
+        binding.btnMatte.setOnClickListener {
+            binding.faceMeshOverlay.isGlossy = false
+            binding.btnMatte.setBackgroundResource(R.drawable.toggle_selected_bg)
+            binding.btnMatte.setTextColor(Color.WHITE)
+            binding.btnGlossy.background = null
+            binding.btnGlossy.setTextColor(0x80FFFFFF.toInt())
+        }
     }
 
     private var selectedView: android.view.View? = null
